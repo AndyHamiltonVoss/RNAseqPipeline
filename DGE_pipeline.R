@@ -23,6 +23,7 @@ source("R/deseq2.R")
 source("R/edger.R")
 source("R/limma.R")
 source("R/dose_response.R")
+source("R/venn_diagrams.R")
 source("R/logging.R")
 
 #===============================================================================
@@ -134,6 +135,19 @@ if (isTRUE(config$run_limma)) {
 if (isTRUE(config$compare_methods)) {
 
     dose_response_results <- run_dose_response(
+        config = config,
+        metadata = metadata
+    )
+
+}
+
+#===============================================================================
+# Run Venn diagram comparison
+#===============================================================================
+
+if (isTRUE(config$compare_methods)) {
+
+    venn_results <- run_venn_diagrams(
         config = config,
         metadata = metadata
     )

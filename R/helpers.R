@@ -35,6 +35,8 @@ create_output_directories <- function(output_directory) {
 
         file.path(output_directory, "Figures"),
 
+        file.path(output_directory, "Figures", "Venn"),
+
         file.path(output_directory, "DESeq2"),
 
         file.path(output_directory, "DESeq2", "Tables"),
