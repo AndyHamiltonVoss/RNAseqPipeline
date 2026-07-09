@@ -19,6 +19,7 @@ source("config.R")
 source("R/helpers.R")
 source("R/io.R")
 source("R/metadata.R")
+source("R/qc.R")
 source("R/deseq2.R")
 source("R/edger.R")
 source("R/limma.R")
@@ -85,6 +86,20 @@ save_metadata(
     metadata = metadata,
     output_directory = config$output_directory
 )
+
+#===============================================================================
+# Run QC / PCA
+#===============================================================================
+
+if (isTRUE(config$run_qc)) {
+
+    qc_results <- run_qc(
+        counts = counts,
+        metadata = metadata,
+        config = config
+    )
+
+}
 
 #===============================================================================
 # Run DESeq2

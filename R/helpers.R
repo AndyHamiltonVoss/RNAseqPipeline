@@ -33,6 +33,10 @@ create_output_directories <- function(output_directory) {
 
         file.path(output_directory, "QC"),
 
+        file.path(output_directory, "QC", "Tables"),
+
+        file.path(output_directory, "QC", "Figures"),
+
         file.path(output_directory, "Figures"),
 
         file.path(output_directory, "Figures", "Venn"),
