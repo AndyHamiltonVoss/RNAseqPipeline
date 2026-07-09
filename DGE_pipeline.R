@@ -22,6 +22,7 @@ source("R/metadata.R")
 source("R/deseq2.R")
 source("R/edger.R")
 source("R/limma.R")
+source("R/dose_response.R")
 source("R/logging.R")
 
 #===============================================================================
@@ -122,6 +123,19 @@ if (isTRUE(config$run_limma)) {
         counts = counts,
         metadata = metadata,
         config = config
+    )
+
+}
+
+#===============================================================================
+# Run dose-response comparison
+#===============================================================================
+
+if (isTRUE(config$compare_methods)) {
+
+    dose_response_results <- run_dose_response(
+        config = config,
+        metadata = metadata
     )
 
 }

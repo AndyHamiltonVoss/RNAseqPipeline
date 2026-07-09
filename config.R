@@ -117,6 +117,17 @@ config <- list(
 
 
     #---------------------------------------------------------------------------
+    # Method Comparison / Dose-Response
+    #---------------------------------------------------------------------------
+
+    # Compounds to plot dose-response curves for. Each must appear in sample
+    # group names as "<compound>_<dose><unit>" (e.g. "Rosi_100nM"), with no
+    # other groups sharing that exact pattern (co-treatments are excluded
+    # automatically since they don't match this pattern).
+    dose_response_compounds = c("Rosi", "MRL24"),
+
+
+    #---------------------------------------------------------------------------
     # Figure Options
     #---------------------------------------------------------------------------
 
