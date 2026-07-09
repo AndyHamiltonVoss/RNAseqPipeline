@@ -26,6 +26,7 @@ source("R/limma.R")
 source("R/dose_response.R")
 source("R/venn_diagrams.R")
 source("R/compound_venn.R")
+source("R/enrichment.R")
 source("R/logging.R")
 
 #===============================================================================
@@ -112,6 +113,19 @@ if (isTRUE(config$run_deseq2)) {
         counts = counts,
         metadata = metadata,
         config = config
+    )
+
+}
+
+#===============================================================================
+# Run GO / KEGG enrichment
+#===============================================================================
+
+if (isTRUE(config$run_go) || isTRUE(config$run_kegg)) {
+
+    enrichment_results <- run_enrichment(
+        config = config,
+        metadata = metadata
     )
 
 }

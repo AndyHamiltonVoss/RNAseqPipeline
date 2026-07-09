@@ -24,6 +24,10 @@ run_qc <- function(counts, metadata, config) {
         stop("Package 'ggplot2' is required.")
     }
 
+    if (!requireNamespace("pheatmap", quietly = TRUE)) {
+        stop("Package 'pheatmap' is required.")
+    }
+
     counts <- counts[, rownames(metadata), drop = FALSE]
 
     vst_data <- tryCatch(
@@ -152,6 +156,70 @@ run_qc <- function(counts, metadata, config) {
 
     }
 
+    #===============================================================================
+    # Heatmap of Top Variable Genes
+    #===============================================================================
+
+    n_heatmap <- min(config$heatmap_top_genes, nrow(vst_data))
+
+    heatmap_genes <- names(sort(gene_vars, decreasing = TRUE))[seq_len(n_heatmap)]
+
+    heatmap_matrix <- vst_data[heatmap_genes, , drop = FALSE]
+
+    save_csv(
+        data.frame(
+            gene = heatmap_genes,
+            variance = gene_vars[heatmap_genes]
+        ),
+        file.path(table_dir, "heatmap_top_genes.csv"),
+        row.names = FALSE
+    )
+
+    annotation_col <- data.frame(
+        Group = metadata[colnames(heatmap_matrix), "group"],
+        row.names = colnames(heatmap_matrix)
+    )
+
+    heatmap_height <- max(config$figure_height, 3 + n_heatmap * 0.15)
+    heatmap_width <- max(config$figure_width, ncol(heatmap_matrix) * 0.1) + 2
+
+    if (isTRUE(config$save_png)) {
+
+        pheatmap::pheatmap(
+            heatmap_matrix,
+            scale = "row",
+            cluster_rows = isTRUE(config$cluster_rows),
+            cluster_cols = isTRUE(config$cluster_columns),
+            annotation_col = annotation_col,
+            show_colnames = FALSE,
+            show_rownames = n_heatmap <= 50,
+            main = "Top Variable Genes",
+            filename = file.path(figure_dir, "Heatmap_top_genes.png"),
+            width = heatmap_width,
+            height = heatmap_height,
+            res = config$figure_dpi
+        )
+
+    }
+
+    if (isTRUE(config$save_pdf)) {
+
+        pheatmap::pheatmap(
+            heatmap_matrix,
+            scale = "row",
+            cluster_rows = isTRUE(config$cluster_rows),
+            cluster_cols = isTRUE(config$cluster_columns),
+            annotation_col = annotation_col,
+            show_colnames = FALSE,
+            show_rownames = n_heatmap <= 50,
+            main = "Top Variable Genes",
+            filename = file.path(figure_dir, "Heatmap_top_genes.pdf"),
+            width = heatmap_width,
+            height = heatmap_height
+        )
+
+    }
+
     message("QC / PCA complete.")
 
     return(
@@ -160,7 +228,8 @@ run_qc <- function(counts, metadata, config) {
             scores = scores,
             variance_explained = variance_explained,
             plot = pca_plot,
-            scree_plot = scree_plot
+            scree_plot = scree_plot,
+            heatmap_matrix = heatmap_matrix
         )
     )
 

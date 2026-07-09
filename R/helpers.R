@@ -65,6 +65,18 @@ create_output_directories <- function(output_directory) {
 
         file.path(output_directory, "limma", "Objects"),
 
+        file.path(output_directory, "GO"),
+
+        file.path(output_directory, "GO", "Tables"),
+
+        file.path(output_directory, "GO", "Figures"),
+
+        file.path(output_directory, "KEGG"),
+
+        file.path(output_directory, "KEGG", "Tables"),
+
+        file.path(output_directory, "KEGG", "Figures"),
+
         file.path(output_directory, "Combined"),
 
         file.path(output_directory, "Metadata"),

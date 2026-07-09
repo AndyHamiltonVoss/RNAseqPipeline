@@ -109,11 +109,20 @@ config <- list(
 
     compare_methods = TRUE,
 
-    run_go = FALSE,
+    run_go = TRUE,
 
-    run_kegg = FALSE,
+    run_kegg = TRUE,
 
     run_gsea = FALSE,
+
+
+    #---------------------------------------------------------------------------
+    # GO / KEGG Enrichment
+    #---------------------------------------------------------------------------
+
+    # Gene Ontology sub-ontology for enrichGO: "BP" (biological process),
+    # "MF" (molecular function), or "CC" (cellular component).
+    go_ontology = "BP",
 
 
     #---------------------------------------------------------------------------
