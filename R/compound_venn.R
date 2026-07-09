@@ -257,8 +257,9 @@ run_threshold_sweep_comparison <- function(
         venn_grob <- build_two_way_venn(gene_sets, title, margin = 0.15)
 
         filename_base <- paste0(
-            "Venn_", group_a, "_vs_", group_b, "_", direction,
-            "_lfc", gsub("\\.", "", sprintf("%.2f", cutoff_b))
+            "Venn_", group_a, "_lfc", gsub("\\.", "", sprintf("%.2f", log2fc_cutoff_a)),
+            "_vs_", group_b, "_lfc", gsub("\\.", "", sprintf("%.2f", cutoff_b)),
+            "_", direction
         )
 
         save_venn_plot(
@@ -307,7 +308,8 @@ run_threshold_sweep_comparison <- function(
         file.path(
             figure_dir,
             paste0(
-                "Venn_", group_a, "_vs_", group_b, "_", direction,
+                "Venn_", group_a, "_lfc", gsub("\\.", "", sprintf("%.2f", log2fc_cutoff_a)),
+                "_vs_", group_b, "_", direction,
                 "_threshold_sweep_summary.csv"
             )
         ),
