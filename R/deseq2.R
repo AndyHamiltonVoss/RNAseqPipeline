@@ -26,22 +26,7 @@ run_deseq2 <- function(counts, metadata, config) {
         config$lfc_shrinkage <- FALSE
     }
 
-    metadata$group <- factor(metadata$group)
-
-    if (!config$reference_group %in% levels(metadata$group)) {
-        stop(
-            paste0(
-                "Reference group '",
-                config$reference_group,
-                "' was not found in metadata."
-            )
-        )
-    }
-
-    metadata$group <- stats::relevel(
-        metadata$group,
-        ref = config$reference_group
-    )
+    metadata <- relevel_group(metadata, config$reference_group)
 
     counts <- counts[, rownames(metadata), drop = FALSE]
 

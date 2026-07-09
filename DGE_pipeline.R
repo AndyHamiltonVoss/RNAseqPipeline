@@ -20,6 +20,8 @@ source("R/helpers.R")
 source("R/io.R")
 source("R/metadata.R")
 source("R/deseq2.R")
+source("R/edger.R")
+source("R/limma.R")
 source("R/logging.R")
 
 #===============================================================================
@@ -89,6 +91,34 @@ save_metadata(
 if (isTRUE(config$run_deseq2)) {
 
     deseq2_results <- run_deseq2(
+        counts = counts,
+        metadata = metadata,
+        config = config
+    )
+
+}
+
+#===============================================================================
+# Run edgeR
+#===============================================================================
+
+if (isTRUE(config$run_edger)) {
+
+    edger_results <- run_edger(
+        counts = counts,
+        metadata = metadata,
+        config = config
+    )
+
+}
+
+#===============================================================================
+# Run limma-voom
+#===============================================================================
+
+if (isTRUE(config$run_limma)) {
+
+    limma_results <- run_limma(
         counts = counts,
         metadata = metadata,
         config = config

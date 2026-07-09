@@ -47,11 +47,15 @@ create_output_directories <- function(output_directory) {
 
         file.path(output_directory, "edgeR", "Tables"),
 
+        file.path(output_directory, "edgeR", "Figures"),
+
         file.path(output_directory, "edgeR", "Objects"),
 
         file.path(output_directory, "limma"),
 
         file.path(output_directory, "limma", "Tables"),
+
+        file.path(output_directory, "limma", "Figures"),
 
         file.path(output_directory, "limma", "Objects"),
 
@@ -124,6 +128,36 @@ assert_file_exists <- function(filename){
             call.=FALSE
 
         )
+
+}
+
+#==========================================================================>
+#' Relevel Group Factor
+#'
+#' Ensures a metadata group factor is releveled with the configured
+#' reference group as baseline. Stops if the reference group is absent.
+#==========================================================================>
+
+relevel_group <- function(metadata, reference_group){
+
+    metadata$group <- factor(metadata$group)
+
+    if (!reference_group %in% levels(metadata$group)) {
+        stop(
+            paste0(
+                "Reference group '",
+                reference_group,
+                "' was not found in metadata."
+            )
+        )
+    }
+
+    metadata$group <- stats::relevel(
+        metadata$group,
+        ref = reference_group
+    )
+
+    return(metadata)
 
 }
 
