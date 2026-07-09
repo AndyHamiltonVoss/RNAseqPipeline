@@ -15,7 +15,7 @@
 # Get Consensus Regulated Genes for One Contrast
 #===============================================================================
 
-get_consensus_genes <- function(group, direction, config) {
+get_consensus_genes <- function(group, direction, config, log2fc_cutoff = config$log2fc_cutoff) {
 
     results <- load_method_results(group, config$output_directory, config$reference_group)
 
@@ -23,15 +23,15 @@ get_consensus_genes <- function(group, direction, config) {
 
     classified <- list(
         DESeq2 = if (!is.null(results$DESeq2))
-            classify_genes(results$DESeq2, "gene", "log2FoldChange", "padj", config$alpha, config$log2fc_cutoff)
+            classify_genes(results$DESeq2, "gene", "log2FoldChange", "padj", config$alpha, log2fc_cutoff)
         else empty,
 
         edgeR = if (!is.null(results$edgeR))
-            classify_genes(results$edgeR, "gene", "logFC", "FDR", config$alpha, config$log2fc_cutoff)
+            classify_genes(results$edgeR, "gene", "logFC", "FDR", config$alpha, log2fc_cutoff)
         else empty,
 
         limma = if (!is.null(results$limma))
-            classify_genes(results$limma, "gene", "logFC", "adj.P.Val", config$alpha, config$log2fc_cutoff)
+            classify_genes(results$limma, "gene", "logFC", "adj.P.Val", config$alpha, log2fc_cutoff)
         else empty
     )
 
@@ -70,7 +70,7 @@ find_peak_dose <- function(compound, groups, direction, config) {
 # Build a Two-Way Venn Diagram Grob
 #===============================================================================
 
-build_two_way_venn <- function(gene_sets, title) {
+build_two_way_venn <- function(gene_sets, title, margin = 0.1) {
 
     futile.logger::flog.threshold(
         futile.logger::ERROR,
@@ -86,7 +86,7 @@ build_two_way_venn <- function(gene_sets, title) {
         cat.cex = 1.2,
         main = title,
         main.cex = 1.3,
-        margin = 0.1
+        margin = margin
     )
 
     return(grob)
@@ -200,5 +200,122 @@ run_compound_comparison <- function(
             gene_membership = gene_membership
         )
     )
+
+}
+
+#===============================================================================
+# Compare Two Groups Across a Range of log2FC Cutoffs for One Side
+#===============================================================================
+
+run_threshold_sweep_comparison <- function(
+    group_a,
+    group_b,
+    config,
+    log2fc_cutoff_b_values,
+    log2fc_cutoff_a = config$log2fc_cutoff,
+    direction = "up"
+) {
+
+    message(
+        "Running threshold sweep: ", group_a, " (log2FC>", log2fc_cutoff_a, ") vs ",
+        group_b, " across log2FC cutoffs: ", paste(log2fc_cutoff_b_values, collapse = ", ")
+    )
+
+    if (!requireNamespace("VennDiagram", quietly = TRUE)) {
+        stop("Package 'VennDiagram' is required.")
+    }
+
+    genes_a <- get_consensus_genes(group_a, direction, config, log2fc_cutoff = log2fc_cutoff_a)
+
+    figure_dir <- file.path(config$output_directory, "Figures", "Venn")
+
+    dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
+
+    summary_rows <- list()
+
+    for (cutoff_b in log2fc_cutoff_b_values) {
+
+        message("Processing threshold: ", group_b, " log2FC>", cutoff_b)
+
+        genes_b <- get_consensus_genes(group_b, direction, config, log2fc_cutoff = cutoff_b)
+
+        gene_sets <- stats::setNames(
+            list(genes_a, genes_b),
+            c(
+                paste0(group_a, " (log2FC>", log2fc_cutoff_a, ")"),
+                paste0(group_b, " (log2FC>", cutoff_b, ")")
+            )
+        )
+
+        title <- paste0(
+            group_a, " vs ", group_b,
+            " (", direction, "regulated, consensus)\n",
+            group_a, ": log2FC>", log2fc_cutoff_a,
+            "  |  ", group_b, ": log2FC>", cutoff_b
+        )
+
+        venn_grob <- build_two_way_venn(gene_sets, title, margin = 0.15)
+
+        filename_base <- paste0(
+            "Venn_", group_a, "_vs_", group_b, "_", direction,
+            "_lfc", gsub("\\.", "", sprintf("%.2f", cutoff_b))
+        )
+
+        save_venn_plot(
+            venn_grob, filename_base, figure_dir, config,
+            width = config$figure_width * 1.5,
+            height = config$figure_height
+        )
+
+        only_a <- setdiff(genes_a, genes_b)
+        only_b <- setdiff(genes_b, genes_a)
+        shared <- intersect(genes_a, genes_b)
+
+        summary_rows[[length(summary_rows) + 1]] <- data.frame(
+            group_a = group_a,
+            log2fc_cutoff_a = log2fc_cutoff_a,
+            group_b = group_b,
+            log2fc_cutoff_b = cutoff_b,
+            n_a_only = length(only_a),
+            n_b_only = length(only_b),
+            n_shared = length(shared),
+            n_a_total = length(genes_a),
+            n_b_total = length(genes_b),
+            stringsAsFactors = FALSE
+        )
+
+        gene_membership <- data.frame(
+            gene = union(genes_a, genes_b),
+            stringsAsFactors = FALSE
+        )
+
+        gene_membership[[group_a]] <- gene_membership$gene %in% genes_a
+        gene_membership[[group_b]] <- gene_membership$gene %in% genes_b
+
+        save_csv(
+            gene_membership,
+            file.path(figure_dir, paste0(filename_base, "_gene_membership.csv")),
+            row.names = FALSE
+        )
+
+    }
+
+    summary_table <- do.call(rbind, summary_rows)
+
+    save_csv(
+        summary_table,
+        file.path(
+            figure_dir,
+            paste0(
+                "Venn_", group_a, "_vs_", group_b, "_", direction,
+                "_threshold_sweep_summary.csv"
+            )
+        ),
+        row.names = FALSE
+    )
+
+    message("Threshold sweep comparison complete.")
+
+    return(summary_table)
 
 }

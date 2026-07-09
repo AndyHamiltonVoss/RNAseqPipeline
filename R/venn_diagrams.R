@@ -41,14 +41,21 @@ build_method_venn <- function(gene_sets, title) {
 # Save Venn Diagram Grob
 #===============================================================================
 
-save_venn_plot <- function(venn_grob, filename_base, figure_dir, config) {
+save_venn_plot <- function(
+    venn_grob,
+    filename_base,
+    figure_dir,
+    config,
+    width = config$figure_width,
+    height = config$figure_height
+) {
 
     if (isTRUE(config$save_png)) {
 
         png(
             filename = file.path(figure_dir, paste0(filename_base, ".png")),
-            width = config$figure_width,
-            height = config$figure_height,
+            width = width,
+            height = height,
             units = "in",
             res = config$figure_dpi
         )
@@ -63,8 +70,8 @@ save_venn_plot <- function(venn_grob, filename_base, figure_dir, config) {
 
         pdf(
             file = file.path(figure_dir, paste0(filename_base, ".pdf")),
-            width = config$figure_width,
-            height = config$figure_height
+            width = width,
+            height = height
         )
 
         grid::grid.newpage()
