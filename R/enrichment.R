@@ -144,7 +144,10 @@ save_enrichment_result <- function(result, filename_base, table_dir, figure_dir,
 
     n_show <- min(20, nrow(result_df))
 
-    dot_plot <- enrichplot::dotplot(result, showCategory = n_show)
+    plot_title <- gsub("_", " ", filename_base)
+
+    dot_plot <- enrichplot::dotplot(result, showCategory = n_show) +
+        ggplot2::ggtitle(plot_title)
 
     if (isTRUE(config$save_png)) {
 
