@@ -25,6 +25,7 @@ source("R/edger.R")
 source("R/limma.R")
 source("R/dose_response.R")
 source("R/venn_diagrams.R")
+source("R/compound_venn.R")
 source("R/logging.R")
 
 #===============================================================================
