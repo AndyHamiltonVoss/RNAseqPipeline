@@ -1,0 +1,17 @@
+compound,dose,direction,n_this_study,n_published,n_shared
+Rosi,1nM,up,682,1374,334
+Rosi,1nM,down,631,1174,246
+Rosi,10nM,up,942,1374,502
+Rosi,10nM,down,879,1174,309
+Rosi,100nM,up,1071,1374,557
+Rosi,100nM,down,1036,1174,321
+Rosi,1000nM,up,1134,1374,567
+Rosi,1000nM,down,1071,1174,330
+MRL24,1nM,up,651,26,10
+MRL24,1nM,down,551,8,0
+MRL24,10nM,up,542,26,9
+MRL24,10nM,down,453,8,0
+MRL24,100nM,up,588,26,10
+MRL24,100nM,down,522,8,0
+MRL24,1000nM,up,536,26,10
+MRL24,1000nM,down,474,8,0
