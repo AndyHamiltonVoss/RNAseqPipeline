@@ -1,6 +1,16 @@
 # RNAseqPipeline
 A modular RNA-seq differential expression analysis pipeline using DESeq2, edgeR, and limma.
 
+## Environment
+
+`environment.yml` pins the exact R/Bioconductor package versions this pipeline was run
+with. Recreate it with:
+
+```
+conda env create -f environment.yml
+conda activate dge-methods
+```
+
 ## Pipeline
 
 Run `DGE_pipeline.R` after editing `config.R`. See `config.R` for all available options
