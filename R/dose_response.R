@@ -35,6 +35,24 @@ parse_dose_group <- function(group_name) {
 }
 
 #===============================================================================
+# Convert a Dose String (e.g. "100nM") to Nanomolar
+#===============================================================================
+
+dose_string_to_nM <- function(dose_str) {
+
+    match <- regmatches(dose_str, regexec("^([0-9.]+)(pM|nM|uM|mM)$", dose_str))[[1]]
+
+    if (length(match) != 3) {
+        stop("Invalid dose string: '", dose_str, "' (expected e.g. '100nM')")
+    }
+
+    unit_to_nM <- c(pM = 0.001, nM = 1, uM = 1000, mM = 1e6)
+
+    as.numeric(match[2]) * unit_to_nM[[match[3]]]
+
+}
+
+#===============================================================================
 # Build Dose Series for a Compound
 #===============================================================================
 
@@ -288,6 +306,85 @@ plot_dose_response <- function(counts, direction = c("up", "down")) {
 }
 
 #===============================================================================
+# Plot Combined Up/Down Saturation Curve (Consensus Calls Only)
+#===============================================================================
+#
+# Compounds are colored to match the two-way Venn diagrams in
+# R/compound_venn.R (Rosi = teal "#1b9e77", MRL24 = orange "#d95f02");
+# up/down direction is distinguished by line type and point shape instead
+# of color so both compounds can share a single panel.
+
+plot_dose_response_combined <- function(counts) {
+
+    consensus <- counts[counts$method == "Consensus", ]
+
+    plot_data <- rbind(
+        data.frame(
+            compound = consensus$compound,
+            dose_nM = consensus$dose_nM,
+            direction = "Up",
+            n_genes = consensus$n_up,
+            stringsAsFactors = FALSE
+        ),
+        data.frame(
+            compound = consensus$compound,
+            dose_nM = consensus$dose_nM,
+            direction = "Down",
+            n_genes = -consensus$n_down,
+            stringsAsFactors = FALSE
+        )
+    )
+
+    compound_colors <- c(Rosi = "#1b9e77", MRL24 = "#d95f02")
+
+    unmatched <- setdiff(unique(plot_data$compound), names(compound_colors))
+
+    if (length(unmatched) > 0) {
+
+        extra_palette <- grDevices::colorRampPalette(
+            c("#7570b3", "#e7298a", "#66a61e", "#e6ab02")
+        )(length(unmatched))
+
+        compound_colors <- c(
+            compound_colors,
+            stats::setNames(extra_palette, unmatched)
+        )
+
+    }
+
+    plot <- ggplot2::ggplot(
+        plot_data,
+        ggplot2::aes(
+            x = dose_nM,
+            y = n_genes,
+            color = compound,
+            linetype = direction,
+            shape = direction,
+            group = interaction(compound, direction)
+        )
+    ) +
+        ggplot2::geom_hline(yintercept = 0, color = "grey40", linewidth = 0.4) +
+        ggplot2::geom_line(linewidth = 0.9) +
+        ggplot2::geom_point(size = 2.5) +
+        ggplot2::scale_x_log10() +
+        ggplot2::scale_color_manual(values = compound_colors) +
+        ggplot2::scale_linetype_manual(values = c(Up = "solid", Down = "dashed")) +
+        ggplot2::scale_shape_manual(values = c(Up = 16, Down = 17)) +
+        ggplot2::labs(
+            title = "Consensus Differentially Expressed Genes vs. Dose",
+            x = "Dose (nM, log10 scale)",
+            y = "Number of genes (up positive / down negative)",
+            color = "Compound",
+            linetype = "Direction",
+            shape = "Direction"
+        ) +
+        ggplot2::theme_bw()
+
+    return(plot)
+
+}
+
+#===============================================================================
 # Run Full Dose-Response Comparison
 #===============================================================================
 
@@ -345,6 +442,7 @@ run_dose_response <- function(config, metadata) {
 
     up_plot <- plot_dose_response(all_counts, direction = "up")
     down_plot <- plot_dose_response(all_counts, direction = "down")
+    combined_plot <- plot_dose_response_combined(all_counts)
 
     if (isTRUE(config$save_png)) {
 
@@ -359,6 +457,14 @@ run_dose_response <- function(config, metadata) {
         ggplot2::ggsave(
             file.path(output_dir, "dose_response_downregulated.png"),
             plot = down_plot,
+            width = config$figure_width,
+            height = config$figure_height,
+            dpi = config$figure_dpi
+        )
+
+        ggplot2::ggsave(
+            file.path(output_dir, "dose_response_saturation_consensus.png"),
+            plot = combined_plot,
             width = config$figure_width,
             height = config$figure_height,
             dpi = config$figure_dpi
@@ -382,6 +488,13 @@ run_dose_response <- function(config, metadata) {
             height = config$figure_height
         )
 
+        ggplot2::ggsave(
+            file.path(output_dir, "dose_response_saturation_consensus.pdf"),
+            plot = combined_plot,
+            width = config$figure_width,
+            height = config$figure_height
+        )
+
     }
 
     message("Dose-response comparison complete.")
@@ -390,7 +503,8 @@ run_dose_response <- function(config, metadata) {
         list(
             counts = all_counts,
             up_plot = up_plot,
-            down_plot = down_plot
+            down_plot = down_plot,
+            combined_plot = combined_plot
         )
     )
 

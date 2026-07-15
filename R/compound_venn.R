@@ -17,6 +17,15 @@
 
 get_consensus_genes <- function(group, direction, config, log2fc_cutoff = config$log2fc_cutoff) {
 
+    if (identical(direction, "combined")) {
+        return(
+            union(
+                get_consensus_genes(group, "up", config, log2fc_cutoff),
+                get_consensus_genes(group, "down", config, log2fc_cutoff)
+            )
+        )
+    }
+
     results <- load_method_results(group, config$output_directory, config$reference_group)
 
     empty <- list(up = character(0), down = character(0))
@@ -72,24 +81,132 @@ find_peak_dose <- function(compound, groups, direction, config) {
 
 build_two_way_venn <- function(gene_sets, title, margin = 0.1) {
 
-    futile.logger::flog.threshold(
-        futile.logger::ERROR,
-        name = "VennDiagramLogger"
+    # VennDiagram::draw.pairwise.venn always redraws with the larger set at
+    # its internal "position 1", reassigning category/fill/count labels to
+    # match -- so which set lands left/right (and which count follows which
+    # label) depends on set size, not input order, and fighting that via its
+    # `inverted` flag desyncs the count text from the category labels. A
+    # small custom two-circle plot avoids the issue entirely: position,
+    # color, and count placement are all fixed by input order here.
+
+    category_names <- names(gene_sets)
+
+    n_a_only <- length(setdiff(gene_sets[[1]], gene_sets[[2]]))
+    n_b_only <- length(setdiff(gene_sets[[2]], gene_sets[[1]]))
+    n_shared <- length(intersect(gene_sets[[1]], gene_sets[[2]]))
+
+    n_a_total <- n_a_only + n_shared
+    n_b_total <- n_b_only + n_shared
+
+    # Circle radius scales with sqrt(gene count) so that circle *area* --
+    # what the eye actually compares -- is proportional to set size, floored
+    # so an empty/tiny set is still visible and ceilinged for a stable layout.
+    r_min <- 0.7
+    r_max <- 1.6
+
+    scale_radius <- function(n_total, n_max) {
+        if (n_max <= 0) return(r_min)
+        r_min + (r_max - r_min) * sqrt(n_total / n_max)
+    }
+
+    n_max <- max(n_a_total, n_b_total, 1)
+
+    r_a <- scale_radius(n_a_total, n_max)
+    r_b <- scale_radius(n_b_total, n_max)
+
+    make_circle <- function(x0, y0, r, group, n = 200) {
+        theta <- seq(0, 2 * pi, length.out = n)
+        data.frame(x = x0 + r * cos(theta), y = y0 + r * sin(theta), group = group)
+    }
+
+    offset <- 0.58 * (r_a + r_b) / 2
+
+    circles <- rbind(
+        make_circle(-offset, 0, r_a, category_names[1]),
+        make_circle(offset, 0, r_b, category_names[2])
+    )
+    circles$group <- factor(circles$group, levels = category_names)
+
+    fill_colors <- stats::setNames(c("#1b9e77", "#d95f02"), category_names)
+
+    count_labels <- data.frame(
+        x = c(-offset - r_a * 0.4, 0, offset + r_b * 0.4),
+        y = 0,
+        label = c(n_a_only, n_shared, n_b_only)
     )
 
-    grob <- VennDiagram::venn.diagram(
-        x = gene_sets,
-        filename = NULL,
-        fill = c("#1b9e77", "#d95f02"),
-        alpha = 0.5,
-        cex = 1.3,
-        cat.cex = 1.2,
-        main = title,
-        main.cex = 1.3,
-        margin = margin
+    category_labels <- data.frame(
+        x = c(-offset, offset),
+        y = c(r_a, r_b) + 0.35,
+        label = category_names
     )
 
-    return(grob)
+    plot <- ggplot2::ggplot() +
+        ggplot2::geom_polygon(
+            data = circles,
+            ggplot2::aes(x = x, y = y, group = group, fill = group),
+            alpha = 0.5, color = "black", linewidth = 0.6
+        ) +
+        ggplot2::geom_text(
+            data = count_labels,
+            ggplot2::aes(x = x, y = y, label = label),
+            size = 5
+        ) +
+        ggplot2::geom_text(
+            data = category_labels,
+            ggplot2::aes(x = x, y = y, label = label),
+            size = 4.2
+        ) +
+        ggplot2::scale_fill_manual(values = fill_colors, guide = "none") +
+        ggplot2::coord_fixed(clip = "off") +
+        ggplot2::labs(title = title) +
+        ggplot2::theme_void() +
+        ggplot2::theme(
+            plot.title = ggplot2::element_text(hjust = 0.5, size = 12),
+            plot.margin = ggplot2::margin(20, 20, 20, 20)
+        )
+
+    return(plot)
+
+}
+
+#===============================================================================
+# Save a Two-Way Venn Diagram (ggplot2)
+#===============================================================================
+
+save_two_way_venn_plot <- function(
+    venn_plot,
+    filename_base,
+    figure_dir,
+    config,
+    width = config$figure_width,
+    height = config$figure_height
+) {
+
+    if (isTRUE(config$save_png)) {
+
+        ggplot2::ggsave(
+            file.path(figure_dir, paste0(filename_base, ".png")),
+            plot = venn_plot,
+            width = width,
+            height = height,
+            dpi = config$figure_dpi
+        )
+
+    }
+
+    if (isTRUE(config$save_pdf)) {
+
+        ggplot2::ggsave(
+            file.path(figure_dir, paste0(filename_base, ".pdf")),
+            plot = venn_plot,
+            width = width,
+            height = height
+        )
+
+    }
+
+    invisible(TRUE)
 
 }
 
@@ -107,8 +224,8 @@ run_compound_comparison <- function(
 
     message("Running compound comparison: ", compound_a, " vs ", compound_b)
 
-    if (!requireNamespace("VennDiagram", quietly = TRUE)) {
-        stop("Package 'VennDiagram' is required.")
+    if (!requireNamespace("ggplot2", quietly = TRUE)) {
+        stop("Package 'ggplot2' is required.")
     }
 
     groups <- setdiff(
@@ -141,7 +258,7 @@ run_compound_comparison <- function(
         " (", direction, "regulated, consensus)"
     )
 
-    venn_grob <- build_two_way_venn(gene_sets, title)
+    venn_plot <- build_two_way_venn(gene_sets, title)
 
     figure_dir <- file.path(config$output_directory, "Figures", "Venn")
 
@@ -151,7 +268,7 @@ run_compound_comparison <- function(
         "Venn_", compound_a, "_vs_", compound_b, "_", direction, "_peak_dose"
     )
 
-    save_venn_plot(venn_grob, filename_base, figure_dir, config)
+    save_two_way_venn_plot(venn_plot, filename_base, figure_dir, config)
 
     only_a <- setdiff(genes_a, genes_b)
     only_b <- setdiff(genes_b, genes_a)
@@ -221,8 +338,8 @@ run_threshold_sweep_comparison <- function(
         group_b, " across log2FC cutoffs: ", paste(log2fc_cutoff_b_values, collapse = ", ")
     )
 
-    if (!requireNamespace("VennDiagram", quietly = TRUE)) {
-        stop("Package 'VennDiagram' is required.")
+    if (!requireNamespace("ggplot2", quietly = TRUE)) {
+        stop("Package 'ggplot2' is required.")
     }
 
     genes_a <- get_consensus_genes(group_a, direction, config, log2fc_cutoff = log2fc_cutoff_a)
@@ -247,14 +364,20 @@ run_threshold_sweep_comparison <- function(
             )
         )
 
+        direction_label <- if (identical(direction, "combined")) {
+            "up+down regulated"
+        } else {
+            paste0(direction, "regulated")
+        }
+
         title <- paste0(
             group_a, " vs ", group_b,
-            " (", direction, "regulated, consensus)\n",
+            " (", direction_label, ", consensus)\n",
             group_a, ": log2FC>", log2fc_cutoff_a,
             "  |  ", group_b, ": log2FC>", cutoff_b
         )
 
-        venn_grob <- build_two_way_venn(gene_sets, title, margin = 0.15)
+        venn_plot <- build_two_way_venn(gene_sets, title, margin = 0.15)
 
         filename_base <- paste0(
             "Venn_", group_a, "_lfc", gsub("\\.", "", sprintf("%.2f", log2fc_cutoff_a)),
@@ -262,8 +385,8 @@ run_threshold_sweep_comparison <- function(
             "_", direction
         )
 
-        save_venn_plot(
-            venn_grob, filename_base, figure_dir, config,
+        save_two_way_venn_plot(
+            venn_plot, filename_base, figure_dir, config,
             width = config$figure_width * 1.5,
             height = config$figure_height
         )
