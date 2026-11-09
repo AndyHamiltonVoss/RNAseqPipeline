@@ -30,10 +30,22 @@ run_deseq2 <- function(counts, metadata, config) {
 
     counts <- counts[, rownames(metadata), drop = FALSE]
 
+    design_formula <- config$design_formula
+
+    if ("library" %in% names(metadata) &&
+            nlevels(factor(metadata$library)) > 1 &&
+            !grepl("library", design_formula)) {
+
+        design_formula <- sub("^~\\s*", "~ library + ", design_formula)
+
+        message("Multiple libraries detected; design formula adjusted to: ", design_formula)
+
+    }
+
     dds <- DESeq2::DESeqDataSetFromMatrix(
         countData = round(as.matrix(counts)),
         colData = metadata,
-        design = stats::as.formula(config$design_formula)
+        design = stats::as.formula(design_formula)
     )
 
     dds <- DESeq2::DESeq(dds)

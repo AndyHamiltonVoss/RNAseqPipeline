@@ -137,11 +137,16 @@ check_required_packages <- function(packages){
 
 assert_file_exists <- function(filename){
 
-    if(!file.exists(filename))
+    missing_files <- filename[!file.exists(filename)]
+
+    if(length(missing_files) > 0)
 
         stop(
 
-            paste("File not found:",filename),
+            paste(
+                "File(s) not found:\n",
+                paste(missing_files, collapse = "\n")
+            ),
 
             call.=FALSE
 

@@ -50,3 +50,4 @@ rsconnect/
 
 # Pipeline run outputs
 /Output/
+/Output_*/

@@ -14,19 +14,29 @@ graphics.off()
 # Source configuration and functions
 #===============================================================================
 
-source("config.R")
+config_path <- commandArgs(trailingOnly = TRUE)[1]
+
+if (is.na(config_path)) {
+    config_path <- "config.R"
+}
+
+source(config_path)
 
 source("R/helpers.R")
 source("R/io.R")
 source("R/metadata.R")
 source("R/qc.R")
+source("R/saturation.R")
+source("R/umap.R")
 source("R/deseq2.R")
 source("R/edger.R")
 source("R/limma.R")
 source("R/dose_response.R")
 source("R/venn_diagrams.R")
 source("R/compound_venn.R")
+source("R/dose_concordance.R")
 source("R/enrichment.R")
+source("R/gsva.R")
 source("R/logging.R")
 
 #===============================================================================
@@ -64,14 +74,12 @@ counts <- read_counts(config$counts_file)
 
 validate_counts(counts)
 
-counts <- filter_low_counts(
-    counts = counts,
-    minimum_counts = config$minimum_counts,
-    minimum_samples = config$minimum_samples
-)
-
 #===============================================================================
 # Create and validate metadata
+#===============================================================================
+#
+# Metadata depends only on sample (column) names, which gene filtering never
+# changes, so it is created from the raw counts before filtering.
 #===============================================================================
 
 metadata <- create_metadata(
@@ -90,12 +98,55 @@ save_metadata(
 )
 
 #===============================================================================
+# Run Gene Detection Saturation Curve
+#===============================================================================
+#
+# Loads its own non-deduplicated read counts and QC-depth data (config$
+# saturation_reads_file / saturation_qc_file) independently of the main
+# counts object -- UMI-deduplicated counts discard the duplicate structure
+# needed to ask "how many genes would be detected at a given raw read depth".
+#===============================================================================
+
+if (isTRUE(config$run_saturation_curve)) {
+
+    saturation_results <- run_saturation_curve(
+        metadata = metadata,
+        config = config
+    )
+
+}
+
+#===============================================================================
+# Filter low-count genes
+#===============================================================================
+
+counts <- filter_low_counts(
+    counts = counts,
+    minimum_counts = config$minimum_counts,
+    minimum_samples = config$minimum_samples
+)
+
+#===============================================================================
 # Run QC / PCA
 #===============================================================================
 
 if (isTRUE(config$run_qc)) {
 
     qc_results <- run_qc(
+        counts = counts,
+        metadata = metadata,
+        config = config
+    )
+
+}
+
+#===============================================================================
+# Run UMAP
+#===============================================================================
+
+if (isTRUE(config$run_umap)) {
+
+    umap_results <- run_umap(
         counts = counts,
         metadata = metadata,
         config = config
@@ -113,6 +164,19 @@ if (isTRUE(config$run_deseq2)) {
         counts = counts,
         metadata = metadata,
         config = config
+    )
+
+}
+
+#===============================================================================
+# Run GSVA (KEGG gene sets)
+#===============================================================================
+
+if (isTRUE(config$run_gsva)) {
+
+    gsva_results <- run_gsva(
+        config = config,
+        metadata = metadata
     )
 
 }

@@ -37,7 +37,7 @@ create_metadata <- function(
     )
 
     replicate <- sub(
-        "^.*_rep",
+        "^.*_rep-?",
         "",
         sample_names
     )
@@ -53,6 +53,14 @@ create_metadata <- function(
         stringsAsFactors = FALSE
 
     )
+
+    library_map <- attr(counts, "library_map")
+
+    if (!is.null(library_map)) {
+
+        metadata$library <- factor(library_map[sample_names])
+
+    }
 
     rownames(metadata) <- metadata$sample
 

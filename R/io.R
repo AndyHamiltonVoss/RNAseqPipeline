@@ -18,18 +18,60 @@ read_counts <- function(counts_file) {
 
     message("Reading count matrix...")
 
-    counts <- data.table::fread(
-        counts_file,
-        data.table = FALSE
-    )
+    if (length(counts_file) > 1) {
 
-    if (ncol(counts) < 2) {
-        stop("Count matrix must contain at least one sample column.")
+        tables <- lapply(
+            counts_file,
+            data.table::fread,
+            data.table = FALSE
+        )
+
+        gene_ids <- tables[[1]][[1]]
+
+        matches_gene_ids <- vapply(
+            tables,
+            function(x) identical(x[[1]], gene_ids),
+            logical(1)
+        )
+
+        if (!all(matches_gene_ids)) {
+            stop(
+                "Gene ID column differs across count files; cannot merge:\n",
+                paste(counts_file[!matches_gene_ids], collapse = "\n")
+            )
+        }
+
+        sample_tables <- lapply(tables, function(x) x[, -1, drop = FALSE])
+
+        counts <- do.call(cbind, sample_tables)
+
+        rownames(counts) <- gene_ids
+
+        library_map <- rep(
+            sub("\\..*$", "", basename(counts_file)),
+            times = vapply(sample_tables, ncol, integer(1))
+        )
+
+        names(library_map) <- colnames(counts)
+
+        attr(counts, "library_map") <- library_map
+
+    } else {
+
+        counts <- data.table::fread(
+            counts_file,
+            data.table = FALSE
+        )
+
+        if (ncol(counts) < 2) {
+            stop("Count matrix must contain at least one sample column.")
+        }
+
+        rownames(counts) <- counts[[1]]
+
+        counts <- counts[, -1, drop = FALSE]
+
     }
-
-    rownames(counts) <- counts[[1]]
-
-    counts <- counts[, -1, drop = FALSE]
 
     return(counts)
 

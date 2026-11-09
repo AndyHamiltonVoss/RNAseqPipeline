@@ -76,6 +76,16 @@ find_peak_dose <- function(compound, groups, direction, config) {
 }
 
 #===============================================================================
+# Format a Direction Value Into a Plot-Title Label
+#===============================================================================
+
+format_direction_label <- function(direction) {
+
+    if (identical(direction, "combined")) "up+down regulated" else paste0(direction, "regulated")
+
+}
+
+#===============================================================================
 # Build a Two-Way Venn Diagram Grob
 #===============================================================================
 
@@ -364,11 +374,7 @@ run_threshold_sweep_comparison <- function(
             )
         )
 
-        direction_label <- if (identical(direction, "combined")) {
-            "up+down regulated"
-        } else {
-            paste0(direction, "regulated")
-        }
+        direction_label <- format_direction_label(direction)
 
         title <- paste0(
             group_a, " vs ", group_b,
@@ -442,5 +448,182 @@ run_threshold_sweep_comparison <- function(
     message("Threshold sweep comparison complete.")
 
     return(summary_table)
+
+}
+
+#===============================================================================
+# Build a Four-Way (Dose Series) Venn Diagram Grob
+#===============================================================================
+
+build_dose_series_venn <- function(gene_sets, title) {
+
+    # draw.quad.venn (unlike draw.pairwise.venn) keeps its four ellipses in
+    # fixed, input-order positions -- there's no size-based left/right
+    # reordering to fight here, so the VennDiagram package is safe to use
+    # directly for this one.
+
+    futile.logger::flog.threshold(
+        futile.logger::ERROR,
+        name = "VennDiagramLogger"
+    )
+
+    dose_labels <- names(gene_sets)
+
+    fill_colors <- c("#1b9e77", "#d95f02", "#7570b3", "#e7298a")
+
+    grob <- VennDiagram::draw.quad.venn(
+        area1 = length(gene_sets[[1]]),
+        area2 = length(gene_sets[[2]]),
+        area3 = length(gene_sets[[3]]),
+        area4 = length(gene_sets[[4]]),
+        n12 = length(intersect(gene_sets[[1]], gene_sets[[2]])),
+        n13 = length(intersect(gene_sets[[1]], gene_sets[[3]])),
+        n14 = length(intersect(gene_sets[[1]], gene_sets[[4]])),
+        n23 = length(intersect(gene_sets[[2]], gene_sets[[3]])),
+        n24 = length(intersect(gene_sets[[2]], gene_sets[[4]])),
+        n34 = length(intersect(gene_sets[[3]], gene_sets[[4]])),
+        n123 = length(Reduce(intersect, gene_sets[c(1, 2, 3)])),
+        n124 = length(Reduce(intersect, gene_sets[c(1, 2, 4)])),
+        n134 = length(Reduce(intersect, gene_sets[c(1, 3, 4)])),
+        n234 = length(Reduce(intersect, gene_sets[c(2, 3, 4)])),
+        n1234 = length(Reduce(intersect, gene_sets)),
+        category = dose_labels,
+        fill = fill_colors,
+        alpha = 0.5,
+        cex = 1.1,
+        cat.cex = 1.1,
+        cat.col = fill_colors,
+        main = title,
+        main.cex = 1.3,
+        ind = FALSE
+    )
+
+    return(grob)
+
+}
+
+#===============================================================================
+# Break Four Gene Sets Into All Non-Overlapping (Exclusive) Venn Regions
+#===============================================================================
+
+venn_regions_n <- function(gene_sets) {
+
+    n <- length(gene_sets)
+    set_names <- names(gene_sets)
+
+    rows <- list()
+
+    for (k in seq_len(n)) {
+
+        combos <- utils::combn(seq_len(n), k, simplify = FALSE)
+
+        for (idx in combos) {
+
+            included <- Reduce(intersect, gene_sets[idx])
+
+            outside_idx <- setdiff(seq_len(n), idx)
+
+            exclusive <- if (length(outside_idx) > 0) {
+                setdiff(included, Reduce(union, gene_sets[outside_idx]))
+            } else {
+                included
+            }
+
+            rows[[length(rows) + 1]] <- data.frame(
+                region = paste(set_names[idx], collapse = " & "),
+                n_genes = length(exclusive),
+                stringsAsFactors = FALSE
+            )
+
+        }
+
+    }
+
+    do.call(rbind, rows)
+
+}
+
+#===============================================================================
+# Compare a Compound's Own Dose Series (Four-Way Venn)
+#===============================================================================
+
+run_dose_series_venn <- function(compound, config, metadata, direction = "combined") {
+
+    message("Running dose series Venn comparison: ", compound)
+
+    if (!requireNamespace("VennDiagram", quietly = TRUE)) {
+        stop("Package 'VennDiagram' is required.")
+    }
+
+    groups <- setdiff(
+        levels(factor(metadata$group)),
+        config$reference_group
+    )
+
+    series <- get_dose_series(groups, compound)
+
+    if (nrow(series) != 4) {
+        stop(
+            "run_dose_series_venn() expects exactly 4 doses for compound '",
+            compound, "', found ", nrow(series), ": ",
+            paste(series$group, collapse = ", ")
+        )
+    }
+
+    dose_labels <- sub(paste0("^", compound, "_"), "", series$group)
+
+    gene_sets <- stats::setNames(
+        lapply(series$group, function(g) get_consensus_genes(g, direction, config)),
+        dose_labels
+    )
+
+    title <- paste0(
+        compound, " Dose Series (", format_direction_label(direction), ", consensus)"
+    )
+
+    venn_grob <- build_dose_series_venn(gene_sets, title)
+
+    figure_dir <- file.path(config$output_directory, "Figures", "Venn")
+
+    dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
+
+    filename_base <- paste0("Venn_", compound, "_dose_series_", direction)
+
+    save_venn_plot(
+        venn_grob, filename_base, figure_dir, config,
+        width = config$figure_width, height = config$figure_height
+    )
+
+    overlap_summary <- venn_regions_n(gene_sets)
+
+    all_genes <- Reduce(union, gene_sets)
+
+    gene_membership <- data.frame(gene = all_genes, stringsAsFactors = FALSE)
+
+    for (i in seq_along(gene_sets)) {
+        gene_membership[[dose_labels[i]]] <- gene_membership$gene %in% gene_sets[[i]]
+    }
+
+    save_csv(
+        overlap_summary,
+        file.path(figure_dir, paste0(filename_base, "_overlap_counts.csv")),
+        row.names = FALSE
+    )
+
+    save_csv(
+        gene_membership,
+        file.path(figure_dir, paste0(filename_base, "_gene_membership.csv")),
+        row.names = FALSE
+    )
+
+    message("Dose series Venn comparison complete.")
+
+    return(
+        list(
+            gene_sets = gene_sets,
+            overlap_summary = overlap_summary,
+            gene_membership = gene_membership
+        )
+    )
 
 }
