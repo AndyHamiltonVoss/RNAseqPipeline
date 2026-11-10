@@ -30,6 +30,7 @@ source("R/saturation.R")
 source("R/ercc_qc.R")
 source("R/umap.R")
 source("R/deseq2.R")
+source("R/control_plate_correlation.R")
 source("R/edger.R")
 source("R/limma.R")
 source("R/dose_response.R")
@@ -196,6 +197,20 @@ if (isTRUE(config$run_deseq2)) {
 
     deseq2_results <- run_deseq2(
         counts = counts,
+        metadata = metadata,
+        config = config
+    )
+
+}
+
+#===============================================================================
+# Run Inter-Plate Control-Well Correlation
+#===============================================================================
+
+if (isTRUE(config$run_deseq2) && isTRUE(config$run_control_plate_correlation)) {
+
+    control_plate_correlation_results <- run_control_plate_correlation(
+        normalized_counts = deseq2_results$normalized_counts,
         metadata = metadata,
         config = config
     )
