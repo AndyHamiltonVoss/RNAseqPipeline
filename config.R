@@ -103,6 +103,10 @@ config <- list(
 
     run_saturation_curve = TRUE,
 
+    run_ercc_cv = TRUE,
+
+    run_ercc_dose_heatmap = TRUE,
+
     run_umap = TRUE,
 
     run_deseq2 = TRUE,
@@ -272,6 +276,14 @@ config <- list(
 
     # Step size (in reads) of the downsampling depth grid.
     saturation_step = 100000,
+
+
+    #---------------------------------------------------------------------------
+    # ERCC Spike-In QC
+    #---------------------------------------------------------------------------
+
+    # Spike-in row ID prefix in counts_file (the main, UMI-deduplicated matrix).
+    ercc_prefix = "ERCC",
 
 
     #---------------------------------------------------------------------------

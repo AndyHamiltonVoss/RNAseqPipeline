@@ -27,11 +27,13 @@ source("R/io.R")
 source("R/metadata.R")
 source("R/qc.R")
 source("R/saturation.R")
+source("R/ercc_qc.R")
 source("R/umap.R")
 source("R/deseq2.R")
 source("R/edger.R")
 source("R/limma.R")
 source("R/dose_response.R")
+source("R/ercc_dose_heatmap.R")
 source("R/venn_diagrams.R")
 source("R/compound_venn.R")
 source("R/dose_concordance.R")
@@ -110,6 +112,38 @@ save_metadata(
 if (isTRUE(config$run_saturation_curve)) {
 
     saturation_results <- run_saturation_curve(
+        metadata = metadata,
+        config = config
+    )
+
+}
+
+#===============================================================================
+# Run ERCC Spike-In %CV by Plate
+#===============================================================================
+#
+# Runs on raw, unfiltered counts so no legitimate low-abundance ERCC probe is
+# dropped by the gene-level count filter before being summed.
+#===============================================================================
+
+if (isTRUE(config$run_ercc_cv)) {
+
+    ercc_results <- run_ercc_cv(
+        counts = counts,
+        metadata = metadata,
+        config = config
+    )
+
+}
+
+#===============================================================================
+# Run nUMI/nERCC Ratio Heatmap by Drug x Dose
+#===============================================================================
+
+if (isTRUE(config$run_ercc_dose_heatmap)) {
+
+    ercc_dose_heatmap_results <- run_ercc_umi_ratio_heatmap(
+        counts = counts,
         metadata = metadata,
         config = config
     )

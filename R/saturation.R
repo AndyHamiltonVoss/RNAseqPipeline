@@ -160,6 +160,7 @@ run_saturation_curve <- function(metadata, config) {
 
         summary_rows[[sample]] <- data.frame(
             sample = sample,
+            well = info$sample,
             total_reads = total,
             gene_assigned_reads_including_spikes = assigned,
             endogenous_assigned_reads = as.integer(sum(c_vec)),
@@ -189,6 +190,22 @@ run_saturation_curve <- function(metadata, config) {
         sample_summary$library <- config$project_name
         curve_data$library <- config$project_name
     }
+
+    well_parts <- regmatches(
+        sample_summary$well,
+        regexec("^([A-Za-z])([0-9]{2})$", sample_summary$well)
+    )
+
+    if (any(lengths(well_parts) != 3)) {
+        stop("Well ID(s) did not match the expected [Letter][2-digit column] format.")
+    }
+
+    sample_summary$well_row <- factor(
+        vapply(well_parts, `[`, character(1), 2),
+        levels = sort(unique(vapply(well_parts, `[`, character(1), 2)), decreasing = TRUE)
+    )
+
+    sample_summary$well_column <- as.integer(vapply(well_parts, `[`, character(1), 3))
 
     output_dir <- file.path(config$output_directory, "QC", "Saturation")
 
@@ -275,6 +292,66 @@ run_saturation_curve <- function(metadata, config) {
 
     }
 
+    #===============================================================================
+    # Plate Layout: Per-Well Pass/Fail Against the 10k-Genes-at-1M Benchmark
+    #===============================================================================
+
+    benchmark_colors <- c(
+        at_or_above_10000 = "#1b9e77",
+        below_10000 = "#d95f02",
+        not_evaluable = "#999999"
+    )
+
+    plate_layout_plot <- ggplot2::ggplot(
+        sample_summary,
+        ggplot2::aes(x = well_column, y = well_row, fill = benchmark_1M)
+    ) +
+        ggplot2::geom_tile(color = "white", linewidth = 0.4) +
+        ggplot2::scale_fill_manual(
+            values = benchmark_colors,
+            name = "Benchmark @ 1M reads",
+            labels = c(
+                at_or_above_10000 = ">= 10,000 genes",
+                below_10000 = "< 10,000 genes",
+                not_evaluable = "not evaluable (< 1M reads)"
+            )
+        ) +
+        ggplot2::scale_x_continuous(breaks = sort(unique(sample_summary$well_column))) +
+        ggplot2::coord_equal() +
+        ggplot2::facet_wrap(~library) +
+        ggplot2::labs(
+            title = "Plate Layout: 10,000-Gene Benchmark at 1M Reads, by Well",
+            x = "Column",
+            y = "Row"
+        ) +
+        ggplot2::theme_bw()
+
+    plate_plot_width <- max(config$figure_width, min(n_libraries, 4) * 3)
+    plate_plot_height <- max(config$figure_height, ceiling(n_libraries / 4) * 3)
+
+    if (isTRUE(config$save_png)) {
+
+        ggplot2::ggsave(
+            file.path(figure_dir, "Plate_layout.png"),
+            plot = plate_layout_plot,
+            width = plate_plot_width,
+            height = plate_plot_height,
+            dpi = config$figure_dpi
+        )
+
+    }
+
+    if (isTRUE(config$save_pdf)) {
+
+        ggplot2::ggsave(
+            file.path(figure_dir, "Plate_layout.pdf"),
+            plot = plate_layout_plot,
+            width = plate_plot_width,
+            height = plate_plot_height
+        )
+
+    }
+
     message("Gene detection saturation curve complete.")
 
     return(
@@ -282,7 +359,8 @@ run_saturation_curve <- function(metadata, config) {
             curves = curve_data,
             sample_summary = sample_summary,
             group_summary = group_summary,
-            plot = saturation_plot
+            plot = saturation_plot,
+            plate_layout_plot = plate_layout_plot
         )
     )
 
