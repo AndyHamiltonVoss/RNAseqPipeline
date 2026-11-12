@@ -39,6 +39,7 @@ source("R/de_gene_heatmap.R")
 source("R/compound_similarity.R")
 source("R/venn_diagrams.R")
 source("R/compound_venn.R")
+source("R/ligand_group_venn.R")
 source("R/dose_concordance.R")
 source("R/enrichment.R")
 source("R/gsva.R")
@@ -238,6 +239,18 @@ if (isTRUE(config$run_deseq2) && isTRUE(config$run_de_gene_heatmap)) {
 if (isTRUE(config$run_deseq2) && isTRUE(config$run_compound_similarity)) {
 
     compound_similarity_results <- run_compound_similarity(
+        config = config
+    )
+
+}
+
+#===============================================================================
+# Run Ligand-Group Venn Diagrams
+#===============================================================================
+
+if (isTRUE(config$run_deseq2) && isTRUE(config$run_ligand_group_venn)) {
+
+    ligand_group_venn_results <- run_ligand_group_venn(
         config = config
     )
 

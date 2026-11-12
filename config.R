@@ -111,6 +111,8 @@ config <- list(
 
     run_compound_similarity = FALSE,
 
+    run_ligand_group_venn = FALSE,
+
     run_control_plate_correlation = TRUE,
 
     run_umap = TRUE,
@@ -192,6 +194,12 @@ config <- list(
     # other groups sharing that exact pattern (co-treatments are excluded
     # automatically since they don't match this pattern).
     dose_response_compounds = c("Rosi", "MRL24"),
+
+    # Named list of 2-5 compound codes per entry, for R/ligand_group_venn.R.
+    # Empty here since run_ligand_group_venn is off (only 2 compounds in this
+    # dataset; run_compound_comparison() in R/compound_venn.R already covers
+    # a direct Rosi-vs-MRL24 comparison).
+    venn_compound_groups = list(),
 
     # Named list of custom dose-subset "core" gene sets to also run GO/KEGG
     # enrichment on (genes up/down consistently across just the listed doses),

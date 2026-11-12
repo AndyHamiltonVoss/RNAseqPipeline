@@ -135,6 +135,8 @@ config <- list(
 
     run_compound_similarity = TRUE,
 
+    run_ligand_group_venn = TRUE,
+
     run_control_plate_correlation = TRUE,
 
     run_umap = TRUE,
@@ -189,6 +191,18 @@ config <- list(
     dose_response_compounds = character(0),
 
     core_gene_set_subsets = list(),
+
+    # Starting points, not a final answer -- edit/replace freely. Each entry
+    # is 2-5 compound codes for a Venn diagram (R/ligand_group_venn.R),
+    # seeded from this session's Jaccard/LFC-correlation clustering
+    # (Output_AMP0961/DESeq2/Tables/compound_jaccard_similarity.csv,
+    # compound_lfc_correlation.csv).
+    venn_compound_groups = list(
+        full_agonists = c("GW1929", "Dar", "Rosi", "Eda"),
+        av_series = c("AV1", "AV2", "AV3", "AV4"),
+        mid_potency = c("13ac", "3g", "1L", "INT131", "DS6930"),
+        outlier_contrast = c("T007", "SR1664")
+    ),
 
 
     #---------------------------------------------------------------------------
