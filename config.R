@@ -109,6 +109,8 @@ config <- list(
 
     run_de_gene_heatmap = FALSE,
 
+    run_compound_similarity = FALSE,
+
     run_control_plate_correlation = TRUE,
 
     run_umap = TRUE,

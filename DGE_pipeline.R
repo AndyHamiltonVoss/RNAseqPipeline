@@ -36,6 +36,7 @@ source("R/limma.R")
 source("R/dose_response.R")
 source("R/ercc_dose_heatmap.R")
 source("R/de_gene_heatmap.R")
+source("R/compound_similarity.R")
 source("R/venn_diagrams.R")
 source("R/compound_venn.R")
 source("R/dose_concordance.R")
@@ -225,6 +226,18 @@ if (isTRUE(config$run_deseq2) && isTRUE(config$run_control_plate_correlation)) {
 if (isTRUE(config$run_deseq2) && isTRUE(config$run_de_gene_heatmap)) {
 
     de_gene_heatmap_results <- run_de_gene_heatmap(
+        config = config
+    )
+
+}
+
+#===============================================================================
+# Run Compound-vs-Compound Gene Similarity
+#===============================================================================
+
+if (isTRUE(config$run_deseq2) && isTRUE(config$run_compound_similarity)) {
+
+    compound_similarity_results <- run_compound_similarity(
         config = config
     )
 

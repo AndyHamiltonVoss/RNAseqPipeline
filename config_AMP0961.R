@@ -133,6 +133,8 @@ config <- list(
 
     run_de_gene_heatmap = TRUE,
 
+    run_compound_similarity = TRUE,
+
     run_control_plate_correlation = TRUE,
 
     run_umap = TRUE,
