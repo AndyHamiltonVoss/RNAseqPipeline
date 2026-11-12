@@ -151,12 +151,77 @@ run_de_gene_heatmap <- function(config) {
 
     }
 
+    updown_data <- rbind(
+        data.frame(
+            compound = cell_data$compound,
+            dose_rank = cell_data$dose_rank,
+            direction = "Upregulated",
+            n_genes = cell_data$n_up
+        ),
+        data.frame(
+            compound = cell_data$compound,
+            dose_rank = cell_data$dose_rank,
+            direction = "Downregulated",
+            n_genes = cell_data$n_down
+        )
+    )
+
+    updown_data$direction <- factor(
+        updown_data$direction,
+        levels = c("Upregulated", "Downregulated")
+    )
+
+    updown_plot <- ggplot2::ggplot(
+        updown_data,
+        ggplot2::aes(x = dose_rank, y = compound, fill = n_genes)
+    ) +
+        ggplot2::geom_tile(color = "white") +
+        ggplot2::geom_text(ggplot2::aes(label = n_genes), size = 2.8) +
+        ggplot2::scale_fill_viridis_c(name = "DE genes (n)") +
+        ggplot2::facet_wrap(~direction) +
+        ggplot2::labs(
+            title = "Up- vs. Downregulated Gene Count by Drug and Dose",
+            subtitle = sprintf(
+                "DESeq2, apeglm-shrunk LFC; alpha = %s, |log2FC| > %s",
+                config$alpha, config$log2fc_cutoff
+            ),
+            x = "Dose (ordinal rank, lowest to highest per compound)",
+            y = "Compound"
+        ) +
+        ggplot2::theme_bw()
+
+    updown_width <- max(config$figure_width * 1.8, n_doses * 1.2 * 2)
+
+    if (isTRUE(config$save_png)) {
+
+        ggplot2::ggsave(
+            file.path(figure_dir, "DE_gene_count_heatmap_up_down.png"),
+            plot = updown_plot,
+            width = updown_width,
+            height = plot_height,
+            dpi = config$figure_dpi
+        )
+
+    }
+
+    if (isTRUE(config$save_pdf)) {
+
+        ggplot2::ggsave(
+            file.path(figure_dir, "DE_gene_count_heatmap_up_down.pdf"),
+            plot = updown_plot,
+            width = updown_width,
+            height = plot_height
+        )
+
+    }
+
     message("DE gene count heatmap complete.")
 
     return(
         list(
             cell_data = cell_data,
-            plot = heatmap_plot
+            plot = heatmap_plot,
+            updown_plot = updown_plot
         )
     )
 
