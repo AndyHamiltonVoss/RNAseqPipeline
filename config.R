@@ -113,6 +113,8 @@ config <- list(
 
     run_ligand_group_venn = FALSE,
 
+    run_t007_curated_comparison = FALSE,
+
     run_control_plate_correlation = TRUE,
 
     run_umap = TRUE,
@@ -205,6 +207,11 @@ config <- list(
     # only (they still get their own per-group Venn). Empty here since
     # venn_compound_groups is also empty.
     venn_cross_group_exclude = character(0),
+
+    # Not used here -- run_t007_curated_comparison is off (AMP0786's T007
+    # co-treatment is shaped differently: varying T007 dose at one fixed
+    # compound dose, not a single fixed-T007-dose arm per compound).
+    t007_co_treatment_suffix = "",
 
     # Named list of custom dose-subset "core" gene sets to also run GO/KEGG
     # enrichment on (genes up/down consistently across just the listed doses),

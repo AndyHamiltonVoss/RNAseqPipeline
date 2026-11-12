@@ -40,6 +40,7 @@ source("R/compound_similarity.R")
 source("R/venn_diagrams.R")
 source("R/compound_venn.R")
 source("R/ligand_group_venn.R")
+source("R/t007_curated_comparison.R")
 source("R/dose_concordance.R")
 source("R/enrichment.R")
 source("R/gsva.R")
@@ -251,6 +252,18 @@ if (isTRUE(config$run_deseq2) && isTRUE(config$run_compound_similarity)) {
 if (isTRUE(config$run_deseq2) && isTRUE(config$run_ligand_group_venn)) {
 
     ligand_group_venn_results <- run_ligand_group_venn(
+        config = config
+    )
+
+}
+
+#===============================================================================
+# Run T007-Curated Upregulated Gene Comparison
+#===============================================================================
+
+if (isTRUE(config$run_deseq2) && isTRUE(config$run_t007_curated_comparison)) {
+
+    t007_curated_results <- run_t007_curated_comparison(
         config = config
     )
 

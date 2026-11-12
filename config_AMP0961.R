@@ -137,6 +137,8 @@ config <- list(
 
     run_ligand_group_venn = TRUE,
 
+    run_t007_curated_comparison = TRUE,
+
     run_control_plate_correlation = TRUE,
 
     run_umap = TRUE,
@@ -210,6 +212,12 @@ config <- list(
     # deliberately a divergence sanity check, not a real pharmacological
     # cluster, so it just adds empty regions/clutter to that comparison.
     venn_cross_group_exclude = c("outlier_contrast"),
+
+    # Co-treatment suffix appended to a compound's own top-dose group name
+    # (e.g. "GW1929_100nM" -> "GW1929_100nM_T007_100nM") for
+    # R/t007_curated_comparison.R. SR1664, SR16832, and T007 itself have no
+    # such contrast and are excluded from that analysis.
+    t007_co_treatment_suffix = "T007_100nM",
 
 
     #---------------------------------------------------------------------------
