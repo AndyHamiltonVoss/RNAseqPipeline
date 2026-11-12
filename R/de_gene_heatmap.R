@@ -95,6 +95,17 @@ run_de_gene_heatmap <- function(config) {
 
     cell_data$dose_label <- format_dose_label(cell_data$dose_nM)
 
+    cell_data$log2_up_down_ratio <- ifelse(
+        cell_data$n_up + cell_data$n_down == 0,
+        NA_real_,
+        log2((cell_data$n_up + 1) / (cell_data$n_down + 1))
+    )
+
+    cell_data$ratio_label <- ifelse(
+        is.na(cell_data$log2_up_down_ratio), "",
+        sprintf("%.2f", cell_data$log2_up_down_ratio)
+    )
+
     dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
     dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
 
@@ -215,13 +226,61 @@ run_de_gene_heatmap <- function(config) {
 
     }
 
+    ratio_plot <- ggplot2::ggplot(
+        cell_data,
+        ggplot2::aes(x = dose_rank, y = compound, fill = log2_up_down_ratio)
+    ) +
+        ggplot2::geom_tile(color = "white") +
+        ggplot2::geom_text(ggplot2::aes(label = ratio_label), size = 2.8) +
+        ggplot2::scale_fill_gradient2(
+            name = "log2(up/down)\n(+1 pseudocount)",
+            low = "#2166ac", mid = "white", high = "#b2182b",
+            midpoint = 0, na.value = "grey80"
+        ) +
+        ggplot2::labs(
+            title = "Up/Down-regulated Gene Ratio by Drug and Dose",
+            subtitle = sprintf(
+                "log2((up+1)/(down+1)); DESeq2, apeglm-shrunk LFC; alpha = %s, |log2FC| > %s. Grey = no DE genes either direction.",
+                config$alpha, config$log2fc_cutoff
+            ),
+            x = "Dose (ordinal rank, lowest to highest per compound)",
+            y = "Compound"
+        ) +
+        ggplot2::theme_bw()
+
+    ratio_plot_width <- max(plot_width, 11)
+
+    if (isTRUE(config$save_png)) {
+
+        ggplot2::ggsave(
+            file.path(figure_dir, "DE_gene_up_down_ratio_heatmap.png"),
+            plot = ratio_plot,
+            width = ratio_plot_width,
+            height = plot_height,
+            dpi = config$figure_dpi
+        )
+
+    }
+
+    if (isTRUE(config$save_pdf)) {
+
+        ggplot2::ggsave(
+            file.path(figure_dir, "DE_gene_up_down_ratio_heatmap.pdf"),
+            plot = ratio_plot,
+            width = ratio_plot_width,
+            height = plot_height
+        )
+
+    }
+
     message("DE gene count heatmap complete.")
 
     return(
         list(
             cell_data = cell_data,
             plot = heatmap_plot,
-            updown_plot = updown_plot
+            updown_plot = updown_plot,
+            ratio_plot = ratio_plot
         )
     )
 
