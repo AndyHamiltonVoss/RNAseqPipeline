@@ -107,6 +107,8 @@ config <- list(
 
     run_ercc_dose_heatmap = TRUE,
 
+    run_de_gene_heatmap = FALSE,
+
     run_control_plate_correlation = TRUE,
 
     run_umap = TRUE,

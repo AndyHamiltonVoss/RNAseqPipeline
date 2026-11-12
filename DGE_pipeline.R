@@ -35,6 +35,7 @@ source("R/edger.R")
 source("R/limma.R")
 source("R/dose_response.R")
 source("R/ercc_dose_heatmap.R")
+source("R/de_gene_heatmap.R")
 source("R/venn_diagrams.R")
 source("R/compound_venn.R")
 source("R/dose_concordance.R")
@@ -212,6 +213,18 @@ if (isTRUE(config$run_deseq2) && isTRUE(config$run_control_plate_correlation)) {
     control_plate_correlation_results <- run_control_plate_correlation(
         normalized_counts = deseq2_results$normalized_counts,
         metadata = metadata,
+        config = config
+    )
+
+}
+
+#===============================================================================
+# Run DE Gene Count Heatmap by Drug x Dose
+#===============================================================================
+
+if (isTRUE(config$run_deseq2) && isTRUE(config$run_de_gene_heatmap)) {
+
+    de_gene_heatmap_results <- run_de_gene_heatmap(
         config = config
     )
 
