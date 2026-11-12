@@ -91,6 +91,9 @@ run_ligand_group_venn <- function(config) {
 
     results_by_group <- list()
 
+    group_consensus_sets <- list(up = list(), down = list())
+    group_union_sets <- list(up = list(), down = list())
+
     for (group_name in names(config$venn_compound_groups)) {
 
         compounds <- config$venn_compound_groups[[group_name]]
@@ -120,6 +123,11 @@ run_ligand_group_venn <- function(config) {
                 lapply(compounds, function(cmpd) per_compound[[cmpd]][[direction]]),
                 compounds
             )
+
+            if (!(group_name %in% config$venn_cross_group_exclude)) {
+                group_consensus_sets[[direction]][[group_name]] <- Reduce(intersect, gene_sets)
+                group_union_sets[[direction]][[group_name]] <- Reduce(union, gene_sets)
+            }
 
             futile.logger::flog.threshold(
                 futile.logger::ERROR,
@@ -172,6 +180,96 @@ run_ligand_group_venn <- function(config) {
 
             results_by_group[[paste0(group_name, "_", direction)]] <- list(
                 gene_sets = gene_sets,
+                overlap_summary = overlap_summary,
+                gene_membership = gene_membership
+            )
+
+        }
+
+    }
+
+    #===========================================================================
+    # Cross-Group Comparison: Each Group's Core Gene Set vs. Every Other Group
+    #===========================================================================
+
+    core_set_types <- list(consensus = group_consensus_sets, union = group_union_sets)
+
+    core_type_labels <- c(
+        consensus = "consensus: all compounds in group agree",
+        union = "union: any compound in group"
+    )
+
+    for (core_type in names(core_set_types)) {
+
+        for (direction in c("up", "down")) {
+
+            group_gene_sets <- core_set_types[[core_type]][[direction]]
+
+            if (length(group_gene_sets) < 2) {
+                next
+            }
+
+            if (length(group_gene_sets) > 5) {
+                warning(
+                    "Skipping group-", core_type, " ", direction, " comparison: ",
+                    "VennDiagram supports 2-5 sets, got ", length(group_gene_sets), "."
+                )
+                next
+            }
+
+            futile.logger::flog.threshold(
+                futile.logger::ERROR,
+                name = "VennDiagramLogger"
+            )
+
+            venn_grob <- VennDiagram::venn.diagram(
+                x = group_gene_sets,
+                filename = NULL,
+                fill = palette[seq_along(group_gene_sets)],
+                alpha = 0.5,
+                cex = 1.1,
+                cat.cex = 1.1,
+                main = sprintf(
+                    "Group Core Comparison (%s): %sregulated genes",
+                    core_type_labels[[core_type]], direction
+                ),
+                main.cex = 1.3,
+                margin = 0.1
+            )
+
+            filename_base <- paste0("Venn_group_", core_type, "_", direction)
+
+            save_venn_plot(
+                venn_grob, filename_base, figure_dir, config,
+                width = max(config$figure_width, 11), height = max(config$figure_height, 7)
+            )
+
+            overlap_summary <- venn_regions_n(group_gene_sets)
+
+            all_genes <- Reduce(union, group_gene_sets)
+
+            gene_membership <- data.frame(gene = all_genes, stringsAsFactors = FALSE)
+
+            group_names_in_set <- names(group_gene_sets)
+
+            for (i in seq_along(group_gene_sets)) {
+                gene_membership[[group_names_in_set[i]]] <- gene_membership$gene %in% group_gene_sets[[i]]
+            }
+
+            save_csv(
+                overlap_summary,
+                file.path(figure_dir, paste0(filename_base, "_overlap_counts.csv")),
+                row.names = FALSE
+            )
+
+            save_csv(
+                gene_membership,
+                file.path(figure_dir, paste0(filename_base, "_gene_membership.csv")),
+                row.names = FALSE
+            )
+
+            results_by_group[[paste0("group_", core_type, "_", direction)]] <- list(
+                gene_sets = group_gene_sets,
                 overlap_summary = overlap_summary,
                 gene_membership = gene_membership
             )

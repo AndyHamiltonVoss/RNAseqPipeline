@@ -201,6 +201,11 @@ config <- list(
     # a direct Rosi-vs-MRL24 comparison).
     venn_compound_groups = list(),
 
+    # Groups to exclude from the cross-group "core signature" comparison
+    # only (they still get their own per-group Venn). Empty here since
+    # venn_compound_groups is also empty.
+    venn_cross_group_exclude = character(0),
+
     # Named list of custom dose-subset "core" gene sets to also run GO/KEGG
     # enrichment on (genes up/down consistently across just the listed doses),
     # in addition to the full-dose-range core set computed automatically for

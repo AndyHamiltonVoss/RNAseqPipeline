@@ -204,6 +204,13 @@ config <- list(
         outlier_contrast = c("T007", "SR1664")
     ),
 
+    # Groups still listed above (so they keep their own per-group Venn) but
+    # excluded from the cross-group "core signature" comparison
+    # (Venn_group_consensus_*/Venn_group_union_*) -- outlier_contrast was
+    # deliberately a divergence sanity check, not a real pharmacological
+    # cluster, so it just adds empty regions/clutter to that comparison.
+    venn_cross_group_exclude = c("outlier_contrast"),
+
 
     #---------------------------------------------------------------------------
     # Figure Options
