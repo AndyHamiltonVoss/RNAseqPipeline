@@ -115,6 +115,22 @@ save_gsva_heatmap <- function(gsva_scores, metadata, config, figure_dir) {
 # Run limma on GSVA Scores (Differential Pathway Activity per Contrast)
 #===============================================================================
 
+adjust_design_formula_for_library <- function(design_formula, metadata) {
+
+    if ("library" %in% names(metadata) &&
+            nlevels(factor(metadata$library)) > 1 &&
+            !grepl("library", design_formula)) {
+
+        design_formula <- sub("^~\\s*", "~ library + ", design_formula)
+
+        message("Multiple libraries detected; design formula adjusted to: ", design_formula)
+
+    }
+
+    design_formula
+
+}
+
 run_gsva_limma <- function(gsva_scores, metadata, config, table_dir, figure_dir, label_pathways_by_group = list()) {
 
     if (!requireNamespace("limma", quietly = TRUE)) {
@@ -125,8 +141,10 @@ run_gsva_limma <- function(gsva_scores, metadata, config, table_dir, figure_dir,
 
     gsva_scores <- gsva_scores[, rownames(metadata), drop = FALSE]
 
+    design_formula <- adjust_design_formula_for_library(config$design_formula, metadata)
+
     design <- stats::model.matrix(
-        stats::as.formula(config$design_formula),
+        stats::as.formula(design_formula),
         data = metadata
     )
 
@@ -190,7 +208,7 @@ run_gsva_limma <- function(gsva_scores, metadata, config, table_dir, figure_dir,
 # Pairwise Limma Comparison Between Two GSVA Groups (Direct, Not vs Reference)
 #===============================================================================
 
-run_gsva_pairwise_limma <- function(gsva_scores, metadata, group1, group2) {
+run_gsva_pairwise_limma <- function(gsva_scores, metadata, group1, group2, config) {
 
     keep_samples <- rownames(metadata)[metadata$group %in% c(group1, group2)]
 
@@ -198,12 +216,18 @@ run_gsva_pairwise_limma <- function(gsva_scores, metadata, group1, group2) {
     pairwise_metadata <- metadata[keep_samples, , drop = FALSE]
     pairwise_metadata$group <- factor(pairwise_metadata$group, levels = c(group2, group1))
 
-    design <- stats::model.matrix(~ group, data = pairwise_metadata)
+    design_formula <- adjust_design_formula_for_library(config$design_formula, pairwise_metadata)
+
+    design <- stats::model.matrix(stats::as.formula(design_formula), data = pairwise_metadata)
 
     fit <- limma::lmFit(pairwise_scores, design)
     fit <- limma::eBayes(fit)
 
-    res_df <- limma::topTable(fit, coef = 2, number = Inf, sort.by = "none")
+    # Named lookup, not positional: a prepended "library" covariate shifts
+    # which column holds the group coefficient.
+    group_coef <- grep("^group", colnames(design), value = TRUE)
+
+    res_df <- limma::topTable(fit, coef = group_coef, number = Inf, sort.by = "none")
 
     res_df$pathway <- rownames(res_df)
     res_df <- res_df[, c("pathway", setdiff(colnames(res_df), "pathway"))]
@@ -428,7 +452,7 @@ run_gsva <- function(config, metadata, exclude_pattern = config$exclude_groups_p
                 next
             }
 
-            pairwise_result <- run_gsva_pairwise_limma(gsva_scores, metadata, group1, group2)
+            pairwise_result <- run_gsva_pairwise_limma(gsva_scores, metadata, group1, group2, config)
 
             save_gsva_volcano(pairwise_result, group1, group2, config, figure_dir, table_dir)
 
