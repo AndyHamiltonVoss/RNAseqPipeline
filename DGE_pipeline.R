@@ -45,6 +45,7 @@ source("R/dose_concordance.R")
 source("R/enrichment.R")
 source("R/gsva.R")
 source("R/gsva_compound_correlation.R")
+source("R/gene_vs_pathway_correlation_comparison.R")
 source("R/logging.R")
 
 #===============================================================================
@@ -290,6 +291,22 @@ if (isTRUE(config$run_gsva)) {
 if (isTRUE(config$run_gsva) && isTRUE(config$run_gsva_compound_correlation)) {
 
     gsva_compound_correlation_results <- run_gsva_compound_correlation(
+        config = config
+    )
+
+}
+
+#===============================================================================
+# Run Gene-Level vs. Pathway-Level Compound Similarity Comparison
+#===============================================================================
+
+if (
+    isTRUE(config$run_deseq2) && isTRUE(config$run_compound_similarity) &&
+    isTRUE(config$run_gsva) && isTRUE(config$run_gsva_compound_correlation) &&
+    isTRUE(config$run_gene_vs_pathway_comparison)
+) {
+
+    gene_vs_pathway_comparison_results <- run_gene_vs_pathway_comparison(
         config = config
     )
 

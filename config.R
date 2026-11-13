@@ -137,6 +137,8 @@ config <- list(
 
     run_gsva_compound_correlation = FALSE,
 
+    run_gene_vs_pathway_comparison = FALSE,
+
 
     #---------------------------------------------------------------------------
     # GO / KEGG Enrichment
