@@ -222,8 +222,6 @@ save_csv <- function(data,
 
         filename,
 
-        quote=FALSE,
-
         row.names=row.names
 
     )

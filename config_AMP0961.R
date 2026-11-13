@@ -159,6 +159,8 @@ config <- list(
 
     run_gsva = TRUE,
 
+    run_gsva_compound_correlation = TRUE,
+
 
     #---------------------------------------------------------------------------
     # GO / KEGG Enrichment

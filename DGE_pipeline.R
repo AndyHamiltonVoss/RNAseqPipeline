@@ -44,6 +44,7 @@ source("R/t007_curated_comparison.R")
 source("R/dose_concordance.R")
 source("R/enrichment.R")
 source("R/gsva.R")
+source("R/gsva_compound_correlation.R")
 source("R/logging.R")
 
 #===============================================================================
@@ -278,6 +279,18 @@ if (isTRUE(config$run_gsva)) {
     gsva_results <- run_gsva(
         config = config,
         metadata = metadata
+    )
+
+}
+
+#===============================================================================
+# Run Compound-vs-Compound GSVA Pathway Correlation
+#===============================================================================
+
+if (isTRUE(config$run_gsva) && isTRUE(config$run_gsva_compound_correlation)) {
+
+    gsva_compound_correlation_results <- run_gsva_compound_correlation(
+        config = config
     )
 
 }
