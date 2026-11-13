@@ -151,9 +151,9 @@ config <- list(
 
     compare_methods = FALSE,
 
-    run_go = FALSE,
+    run_go = TRUE,
 
-    run_kegg = FALSE,
+    run_kegg = TRUE,
 
     run_gsea = FALSE,
 

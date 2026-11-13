@@ -472,11 +472,21 @@ run_enrichment <- function(
     dir.create(kegg_figure_dir, recursive = TRUE, showWarnings = FALSE)
 
     # All contrasts share one fitted DESeq2 model, so the tested gene universe
-    # is identical across groups; read it once rather than per call.
-    first_group_file <- file.path(
+    # is identical across groups; read it once rather than per call. Try each
+    # group in order in case the first one's file happens to be missing.
+    group_files <- file.path(
         config$output_directory, "DESeq2", "Tables",
-        paste0("DESeq2_group_", groups[1], "_vs_", config$reference_group, "_shrunk.csv")
+        paste0("DESeq2_group_", groups, "_vs_", config$reference_group, "_shrunk.csv")
     )
+
+    first_group_file <- group_files[file.exists(group_files)][1]
+
+    if (is.na(first_group_file)) {
+        stop(
+            "No DESeq2 results found for any non-excluded group; cannot build ",
+            "the shared gene universe. Checked: ", paste(group_files, collapse = ", ")
+        )
+    }
 
     universe_gene_ids <- read.csv(first_group_file)$gene
 
@@ -486,14 +496,20 @@ run_enrichment <- function(
 
         org_db <- get(org_pkg, envir = asNamespace(org_pkg))
 
-        universe_entrez_ids <- suppressMessages(
-            clusterProfiler::bitr(
-                universe_gene_ids,
-                fromType = "ENSEMBL",
-                toType = "ENTREZID",
-                OrgDb = org_db
-            )
-        )$ENTREZID
+        universe_entrez_ids <- tryCatch(
+            suppressMessages(
+                clusterProfiler::bitr(
+                    universe_gene_ids,
+                    fromType = "ENSEMBL",
+                    toType = "ENTREZID",
+                    OrgDb = org_db
+                )
+            )$ENTREZID,
+            error = function(e) {
+                warning("ENSEMBL->ENTREZID mapping failed for the gene universe: ", conditionMessage(e))
+                NULL
+            }
+        )
 
     }
 
