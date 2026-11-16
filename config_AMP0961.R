@@ -135,6 +135,8 @@ config <- list(
 
     run_compound_similarity = TRUE,
 
+    run_gene_expression_skew = TRUE,
+
     run_ligand_group_venn = TRUE,
 
     run_t007_curated_comparison = TRUE,

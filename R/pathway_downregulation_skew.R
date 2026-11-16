@@ -8,8 +8,10 @@
 #   reference group, from the per-contrast limma results already written by
 #   run_gsva() in R/gsva.R) skew toward down-regulation at each compound's
 #   top tested dose? Two views:
-#     - Per-compound % of all scored pathways with negative diff_score (not
-#       just the ones crossing the significance cutoff).
+#     - Per-compound % of all scored pathways with negative vs. positive
+#       diff_score (not just the ones crossing the significance cutoff),
+#       grouped bars so the down-skew is directly comparable to the
+#       up-regulated side rather than only visible as "not 50%".
 #     - Pooled distribution of diff_score across every compound x pathway
 #       combination.
 #   This was added after finding that pathway-level compound-vs-compound
@@ -87,17 +89,27 @@ run_pathway_downregulation_skew <- function(config) {
     }))
 
     #===========================================================================
-    # Per-Compound % of Pathways With Negative diff_score
+    # Per-Compound % of Pathways With Negative vs. Positive diff_score
     #===========================================================================
 
     pct_negative_df <- do.call(rbind, lapply(compounds, function(cmpd) {
         sub <- long_data[long_data$compound == cmpd, ]
-        data.frame(compound = cmpd, pct_negative = mean(sub$diff_score < 0) * 100)
+        data.frame(
+            compound = cmpd,
+            pct_negative = mean(sub$diff_score < 0) * 100,
+            pct_positive = mean(sub$diff_score > 0) * 100
+        )
     }))
 
     overall_mean_pct_negative <- mean(pct_negative_df$pct_negative)
+    overall_mean_pct_positive <- mean(pct_negative_df$pct_positive)
 
     pct_negative_df <- pct_negative_df[order(-pct_negative_df$pct_negative), ]
+
+    pct_long_df <- rbind(
+        data.frame(compound = pct_negative_df$compound, direction = "Down", pct = pct_negative_df$pct_negative),
+        data.frame(compound = pct_negative_df$compound, direction = "Up", pct = pct_negative_df$pct_positive)
+    )
 
     #===========================================================================
     # Pooled diff_score Distribution
@@ -122,8 +134,10 @@ run_pathway_downregulation_skew <- function(config) {
         n_compounds = length(compounds),
         n_pathways = length(unique(long_data$pathway)),
         pooled_pct_negative = pooled_pct_negative,
+        pooled_pct_positive = mean(long_data$diff_score > 0) * 100,
         pooled_median_diff_score = pooled_median,
-        overall_mean_pct_negative_across_compounds = overall_mean_pct_negative
+        overall_mean_pct_negative_across_compounds = overall_mean_pct_negative,
+        overall_mean_pct_positive_across_compounds = overall_mean_pct_positive
     )
 
     save_csv(
@@ -133,26 +147,23 @@ run_pathway_downregulation_skew <- function(config) {
     )
 
     #===========================================================================
-    # Plot: Per-Compound % Negative Bar Chart
+    # Plot: Per-Compound % Down vs. % Up Grouped Bar Chart
     #===========================================================================
 
-    pct_negative_df$compound <- factor(pct_negative_df$compound, levels = pct_negative_df$compound)
+    pct_long_df$compound <- factor(pct_long_df$compound, levels = pct_negative_df$compound)
+    pct_long_df$direction <- factor(pct_long_df$direction, levels = c("Down", "Up"))
 
-    panel1 <- ggplot2::ggplot(pct_negative_df, ggplot2::aes(x = compound, y = pct_negative)) +
-        ggplot2::geom_col(fill = "steelblue") +
+    panel1 <- ggplot2::ggplot(pct_long_df, ggplot2::aes(x = compound, y = pct, fill = direction)) +
+        ggplot2::geom_col(position = ggplot2::position_dodge(width = 0.8), width = 0.7) +
         ggplot2::geom_hline(yintercept = 50, linetype = "dashed", color = "grey30") +
-        ggplot2::geom_hline(yintercept = overall_mean_pct_negative, linetype = "dotted", color = "firebrick") +
-        ggplot2::annotate(
-            "text", x = Inf, y = overall_mean_pct_negative, hjust = 1.05, vjust = -0.5,
-            label = sprintf("mean = %.1f%%", overall_mean_pct_negative), color = "firebrick", size = 3
-        ) +
+        ggplot2::scale_fill_manual(values = c(Down = "steelblue", Up = "darkorange")) +
         ggplot2::labs(
-            title = "Most KEGG pathways trend down at top dose, across nearly every compound",
+            title = "KEGG pathways skew toward down- over up-regulation at top dose, across nearly every compound",
             subtitle = sprintf(
-                "%% of all %d scored pathways with negative diff_score (not just significant ones); dashed line = 50%% (no skew)",
-                length(unique(long_data$pathway))
+                "%% of all %d scored pathways with negative vs. positive diff_score (not just significant ones); mean down = %.1f%%, mean up = %.1f%%\ndashed line = 50%% (no skew)",
+                length(unique(long_data$pathway)), overall_mean_pct_negative, overall_mean_pct_positive
             ),
-            x = "Compound", y = "% of pathways with negative diff_score"
+            x = "Compound", y = "% of pathways", fill = "Direction"
         ) +
         ggplot2::theme_bw() +
         ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
@@ -211,6 +222,7 @@ run_pathway_downregulation_skew <- function(config) {
     return(
         list(
             pct_negative_by_compound = pct_negative_df,
+            pct_long_by_compound = pct_long_df,
             pooled_summary = pooled_summary
         )
     )

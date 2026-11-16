@@ -46,6 +46,7 @@ source("R/enrichment.R")
 source("R/gsva.R")
 source("R/gsva_compound_correlation.R")
 source("R/pathway_downregulation_skew.R")
+source("R/gene_expression_skew.R")
 source("R/gene_vs_pathway_correlation_comparison.R")
 source("R/logging.R")
 
@@ -243,6 +244,18 @@ if (isTRUE(config$run_deseq2) && isTRUE(config$run_de_gene_heatmap)) {
 if (isTRUE(config$run_deseq2) && isTRUE(config$run_compound_similarity)) {
 
     compound_similarity_results <- run_compound_similarity(
+        config = config
+    )
+
+}
+
+#===============================================================================
+# Run Gene Expression Skew Diagnostic
+#===============================================================================
+
+if (isTRUE(config$run_deseq2) && isTRUE(config$run_gene_expression_skew)) {
+
+    gene_expression_skew_results <- run_gene_expression_skew(
         config = config
     )
 
