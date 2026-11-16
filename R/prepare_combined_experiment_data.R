@@ -10,11 +10,30 @@
 #   reference group "Control"), restricted to the two drugs shared
 #   between the experiments (MRL24, Rosi) at their one exactly-shared
 #   dose each (MRL24_100nM, Rosi_1000nM), plus library-matched controls
-#   only. The output is meant to feed a future combined DESeq2 run with a
-#   "~ library + group" design (the same batch-adjustment pattern already
-#   used for AMP0961's own 10-library data, R/deseq2.R:33-43) to separate
-#   the drug effect from the between-experiment batch effect directly,
-#   rather than comparing two independently-fit models post-hoc.
+#   only. "group" has 5 levels: "Control" is pooled across BOTH
+#   experiments (18 samples: 6 AMP0786 + 12 AMP0961 library-matched), but
+#   the two drugs are experiment-specific ("MRL24_100nM_AMP0786",
+#   "MRL24_100nM_AMP0961", "Rosi_1000nM_AMP0786", "Rosi_1000nM_AMP0961"),
+#   so DESeq2 produces separate per-experiment DEG results from one joint
+#   "~ library + group" fit, each vs. the one shared Control baseline,
+#   rather than pooling the two experiments' drug effect into one
+#   combined contrast.
+#
+#   Making Control experiment-specific too (as an earlier version of this
+#   script did) makes "~ library + group" rank-deficient: AMP0786's
+#   single library becomes a perfect linear function of its own 3
+#   (all-AMP0786) group levels. Pooling Control breaks that exclusive
+#   confound -- "library" and "group" no longer perfectly determine each
+#   other -- while still letting the model estimate each library's (incl.
+#   AMP0786's) own baseline level via the "library" term; pooling the
+#   *label* doesn't assume the two experiments' untreated baselines are
+#   numerically identical. Confirmed empirically:
+#   model.matrix(~ library + group) on this metadata is full rank (8
+#   columns, rank 8).
+#
+#   "unified_group" (Control/MRL24_100nM/Rosi_1000nM, pre-experiment-
+#   prefix) and "original_group" (pre-Control-unification, i.e. DMSO vs.
+#   Control) are both kept for traceability.
 #
 ################################################################################
 
@@ -41,7 +60,13 @@ build_combined_experiment_dataset <- function() {
     amp0786_metadata$library <- "SP_L270526AV1_01"
     amp0786_metadata$experiment <- "AMP0786"
     amp0786_metadata$original_group <- amp0786_metadata$group
-    amp0786_metadata$group[amp0786_metadata$group == "DMSO"] <- "Control"
+    amp0786_metadata$unified_group <- amp0786_metadata$group
+    amp0786_metadata$unified_group[amp0786_metadata$unified_group == "DMSO"] <- "Control"
+    amp0786_metadata$group <- ifelse(
+        amp0786_metadata$unified_group == "Control",
+        "Control",
+        paste0(amp0786_metadata$unified_group, "_", amp0786_metadata$experiment)
+    )
     amp0786_metadata$original_sample_id <- amp0786_metadata$sample
     amp0786_metadata$sample <- paste0("AMP0786__", amp0786_metadata$original_sample_id)
 
@@ -65,6 +90,12 @@ build_combined_experiment_dataset <- function() {
 
     amp0961_metadata$experiment <- "AMP0961"
     amp0961_metadata$original_group <- amp0961_metadata$group
+    amp0961_metadata$unified_group <- amp0961_metadata$group
+    amp0961_metadata$group <- ifelse(
+        amp0961_metadata$unified_group == "Control",
+        "Control",
+        paste0(amp0961_metadata$unified_group, "_", amp0961_metadata$experiment)
+    )
     amp0961_metadata$original_sample_id <- amp0961_metadata$sample
     amp0961_metadata$sample <- paste0("AMP0961__", amp0961_metadata$original_sample_id)
 
@@ -72,7 +103,7 @@ build_combined_experiment_dataset <- function() {
     # Combine Metadata
     #===========================================================================
 
-    metadata_columns <- c("sample", "original_sample_id", "group", "original_group", "replicate", "library", "experiment")
+    metadata_columns <- c("sample", "original_sample_id", "group", "unified_group", "original_group", "replicate", "library", "experiment")
 
     combined_metadata <- rbind(
         amp0786_metadata[, metadata_columns],

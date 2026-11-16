@@ -94,10 +94,21 @@ validate_counts(counts)
 # changes, so it is created from the raw counts before filtering.
 #===============================================================================
 
-metadata <- create_metadata(
-    counts = counts,
-    replicate_pattern = config$replicate_pattern
-)
+if (!is.null(config$metadata_file)) {
+
+    metadata <- load_metadata(
+        metadata_file = config$metadata_file,
+        counts = counts
+    )
+
+} else {
+
+    metadata <- create_metadata(
+        counts = counts,
+        replicate_pattern = config$replicate_pattern
+    )
+
+}
 
 validate_metadata(
     metadata = metadata,

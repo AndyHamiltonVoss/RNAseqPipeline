@@ -69,6 +69,55 @@ create_metadata <- function(
 }
 
 #===============================================================================
+#' Load Sample Metadata From an External File
+#'
+#' Reads a pre-built metadata table (e.g. one assembled outside the normal
+#' sample-name-parsing flow, such as a combined multi-experiment dataset)
+#' instead of auto-deriving it from counts column names. The file's
+#' "sample" column must exactly match the counts matrix's column names.
+#===============================================================================
+
+load_metadata <- function(
+    metadata_file,
+    counts
+) {
+
+    assert_file_exists(metadata_file)
+
+    metadata <- utils::read.csv(metadata_file, stringsAsFactors = FALSE)
+
+    if (!"sample" %in% names(metadata)) {
+        stop("Metadata file must contain a 'sample' column.")
+    }
+
+    missing_from_counts <- setdiff(metadata$sample, colnames(counts))
+    missing_from_metadata <- setdiff(colnames(counts), metadata$sample)
+
+    if (length(missing_from_counts) > 0 || length(missing_from_metadata) > 0) {
+        stop(
+            "Metadata 'sample' column and counts column names must match exactly.\n",
+            "In metadata but not counts: ", paste(missing_from_counts, collapse = ", "), "\n",
+            "In counts but not metadata: ", paste(missing_from_metadata, collapse = ", ")
+        )
+    }
+
+    metadata$group <- factor(metadata$group)
+
+    if ("replicate" %in% names(metadata)) {
+        metadata$replicate <- as.integer(metadata$replicate)
+    }
+
+    if ("library" %in% names(metadata)) {
+        metadata$library <- factor(metadata$library)
+    }
+
+    rownames(metadata) <- metadata$sample
+
+    return(metadata)
+
+}
+
+#===============================================================================
 # Validate Metadata
 #===============================================================================
 
