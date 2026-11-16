@@ -45,6 +45,7 @@ source("R/dose_concordance.R")
 source("R/enrichment.R")
 source("R/gsva.R")
 source("R/gsva_compound_correlation.R")
+source("R/pathway_downregulation_skew.R")
 source("R/gene_vs_pathway_correlation_comparison.R")
 source("R/logging.R")
 
@@ -291,6 +292,18 @@ if (isTRUE(config$run_gsva)) {
 if (isTRUE(config$run_gsva) && isTRUE(config$run_gsva_compound_correlation)) {
 
     gsva_compound_correlation_results <- run_gsva_compound_correlation(
+        config = config
+    )
+
+}
+
+#===============================================================================
+# Run Pathway Down-Regulation Skew Diagnostic
+#===============================================================================
+
+if (isTRUE(config$run_gsva) && isTRUE(config$run_pathway_downregulation_skew)) {
+
+    pathway_downregulation_skew_results <- run_pathway_downregulation_skew(
         config = config
     )
 

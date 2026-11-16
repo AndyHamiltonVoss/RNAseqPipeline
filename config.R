@@ -137,6 +137,8 @@ config <- list(
 
     run_gsva_compound_correlation = FALSE,
 
+    run_pathway_downregulation_skew = FALSE,
+
     run_gene_vs_pathway_comparison = FALSE,
 
 
