@@ -159,6 +159,8 @@ config <- list(
 
     run_gsea = FALSE,
 
+    run_pathway_specificity_comparison = TRUE,
+
     run_gsva = TRUE,
 
     run_gsva_compound_correlation = TRUE,

@@ -43,6 +43,7 @@ source("R/ligand_group_venn.R")
 source("R/t007_curated_comparison.R")
 source("R/dose_concordance.R")
 source("R/enrichment.R")
+source("R/pathway_specificity_comparison.R")
 source("R/gsva.R")
 source("R/gsva_compound_correlation.R")
 source("R/pathway_downregulation_skew.R")
@@ -347,6 +348,21 @@ if (isTRUE(config$run_go) || isTRUE(config$run_kegg)) {
     enrichment_results <- run_enrichment(
         config = config,
         metadata = metadata
+    )
+
+}
+
+#===============================================================================
+# Run Pathway Specificity Comparison (Up vs. Down)
+#===============================================================================
+
+if (
+    isTRUE(config$run_go) && isTRUE(config$run_kegg) &&
+    isTRUE(config$run_pathway_specificity_comparison)
+) {
+
+    pathway_specificity_results <- run_pathway_specificity_comparison(
+        config = config
     )
 
 }
