@@ -43,6 +43,7 @@ source("R/ligand_group_venn.R")
 source("R/t007_curated_comparison.R")
 source("R/dose_concordance.R")
 source("R/enrichment.R")
+source("R/enrichment_compound_correlation.R")
 source("R/gsea.R")
 source("R/gsea_compound_correlation.R")
 source("R/pathway_specificity_comparison.R")
@@ -395,6 +396,21 @@ if (isTRUE(config$run_go) || isTRUE(config$run_kegg)) {
     enrichment_results <- run_enrichment(
         config = config,
         metadata = metadata
+    )
+
+}
+
+#===============================================================================
+# Run Compound-vs-Compound GO / KEGG Enrichment Correlation
+#===============================================================================
+
+if (
+    (isTRUE(config$run_go) || isTRUE(config$run_kegg)) &&
+    isTRUE(config$run_enrichment_compound_correlation)
+) {
+
+    enrichment_compound_correlation_results <- run_enrichment_compound_correlation(
+        config = config
     )
 
 }

@@ -133,6 +133,8 @@ config <- list(
 
     run_kegg = TRUE,
 
+    run_enrichment_compound_correlation = FALSE,
+
     run_gsea = FALSE,
 
     run_gsea_compound_correlation = FALSE,

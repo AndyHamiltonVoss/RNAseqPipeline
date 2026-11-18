@@ -169,6 +169,8 @@ config <- list(
 
     run_kegg = FALSE,
 
+    run_enrichment_compound_correlation = FALSE,
+
     run_gsea = FALSE,
 
     run_gsea_compound_correlation = FALSE,
