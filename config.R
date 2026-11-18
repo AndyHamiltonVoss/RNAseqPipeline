@@ -121,6 +121,8 @@ config <- list(
 
     run_umap = TRUE,
 
+    run_umap_top_dose = FALSE,
+
     run_deseq2 = TRUE,
 
     run_limma = TRUE,
@@ -136,6 +138,8 @@ config <- list(
     run_enrichment_compound_correlation = FALSE,
 
     run_gsea = FALSE,
+
+    run_gsea_lfc = FALSE,
 
     run_gsea_compound_correlation = FALSE,
 

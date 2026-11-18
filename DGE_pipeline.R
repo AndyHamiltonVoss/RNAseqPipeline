@@ -228,6 +228,20 @@ if (isTRUE(config$run_umap_batch_corrected)) {
 }
 
 #===============================================================================
+# Run UMAP on Each Compound's Top Tested Dose + Control
+#===============================================================================
+
+if (isTRUE(config$run_umap_top_dose)) {
+
+    umap_top_dose_results <- run_umap_top_dose(
+        counts = counts,
+        metadata = metadata,
+        config = config
+    )
+
+}
+
+#===============================================================================
 # Run DESeq2
 #===============================================================================
 
@@ -423,7 +437,28 @@ if (isTRUE(config$run_gsea)) {
 
     gsea_results <- run_gsea(
         config = config,
-        metadata = metadata
+        metadata = metadata,
+        rank_by = "stat"
+    )
+
+}
+
+#===============================================================================
+# Run GO / KEGG GSEA, Ranked by Shrunken log2FoldChange
+#===============================================================================
+#
+# See R/gsea.R header: reads "_shrunk.csv" DESeq2 tables (output in a
+# separate GSEA_LFC/ directory, not mixed with the stat-ranked GSEA/
+# results), which a fresh run only regenerates when config$lfc_shrinkage
+# = TRUE.
+#===============================================================================
+
+if (isTRUE(config$run_gsea_lfc)) {
+
+    gsea_lfc_results <- run_gsea(
+        config = config,
+        metadata = metadata,
+        rank_by = "log2FoldChange"
     )
 
 }

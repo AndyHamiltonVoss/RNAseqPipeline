@@ -145,6 +145,8 @@ config <- list(
 
     run_umap = TRUE,
 
+    run_umap_top_dose = TRUE,
+
     run_deseq2 = TRUE,
 
     run_limma = FALSE,
@@ -160,6 +162,12 @@ config <- list(
     run_enrichment_compound_correlation = TRUE,
 
     run_gsea = TRUE,
+
+    # See R/gsea.R header: this reads "_shrunk.csv" DESeq2 tables, which
+    # exist here as leftovers from an earlier offline apeglm batch (this
+    # config has lfc_shrinkage = FALSE, so a fresh run does not regenerate
+    # them -- rerunning from scratch would need that batch repeated first).
+    run_gsea_lfc = TRUE,
 
     run_gsea_compound_correlation = TRUE,
 
