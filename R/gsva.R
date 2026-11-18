@@ -112,6 +112,124 @@ save_gsva_heatmap <- function(gsva_scores, metadata, config, figure_dir) {
 }
 
 #===============================================================================
+# Save GSVA Heatmap of Top-Variable Pathways, Top Dose Per Compound Only
+#===============================================================================
+#
+# Same top-N-variable-pathway heatmap as save_gsva_heatmap(), but restricted
+# to the reference group plus each compound's single highest tested dose
+# (via parse_dose_group(), R/dose_response.R) -- the lower-dose replicates
+# and any co-treatment (e.g. "_T007_100nM") groups, which don't match the
+# "<compound>_<dose><unit>" pattern, are dropped. Pathway variance is
+# recomputed on this subset, not reused from the full-dose heatmap, since
+# the point is to see which pathways separate compounds at their most
+# potent dose.
+#===============================================================================
+
+save_gsva_top_dose_heatmap <- function(gsva_scores, metadata, config, figure_dir) {
+
+    groups <- unique(as.character(metadata$group))
+
+    parsed <- lapply(groups, parse_dose_group)
+
+    keep <- vapply(parsed, function(x) !is.null(x), logical(1))
+
+    dose_table <- data.frame(
+        group = groups[keep],
+        compound = vapply(parsed[keep], `[[`, character(1), "compound"),
+        dose_nM = vapply(parsed[keep], `[[`, numeric(1), "dose_nM")
+    )
+
+    top_dose_table <- do.call(
+        rbind,
+        lapply(split(dose_table, dose_table$compound), function(d) {
+            d[which.max(d$dose_nM), ]
+        })
+    )
+
+    selected_groups <- c(config$reference_group, top_dose_table$group)
+
+    sample_names <- rownames(metadata)[metadata$group %in% selected_groups]
+    sample_names <- intersect(sample_names, colnames(gsva_scores))
+
+    # Order columns by group (reference first, then alphabetically) and turn
+    # off column clustering -- this keeps each group's replicates together
+    # as a contiguous block instead of letting the dendrogram interleave
+    # them by sample-level similarity.
+    group_order <- c(config$reference_group, sort(setdiff(unique(as.character(metadata[sample_names, "group"])), config$reference_group)))
+    sample_names <- sample_names[order(match(as.character(metadata[sample_names, "group"]), group_order))]
+
+    message(sprintf(
+        "Top-dose GSVA heatmap: %d compounds at their highest tested dose, %d samples total.",
+        nrow(top_dose_table), length(sample_names)
+    ))
+
+    scores_subset <- gsva_scores[, sample_names, drop = FALSE]
+
+    pathway_vars <- apply(scores_subset, 1, stats::var)
+
+    n_heatmap <- min(config$gsva_heatmap_top_pathways, nrow(scores_subset))
+
+    heatmap_pathways <- names(sort(pathway_vars, decreasing = TRUE))[seq_len(n_heatmap)]
+
+    heatmap_matrix <- scores_subset[heatmap_pathways, , drop = FALSE]
+
+    # Factor levels, not column position, control the pheatmap legend's
+    # order -- set them to group_order so the legend reads top-to-bottom in
+    # the same left-to-right order the groups appear in on the heatmap.
+    annotation_col <- data.frame(
+        Group = factor(as.character(metadata[colnames(heatmap_matrix), "group"]), levels = group_order),
+        row.names = colnames(heatmap_matrix)
+    )
+
+    column_groups <- as.character(metadata[colnames(heatmap_matrix), "group"])
+    gaps_col <- cumsum(rle(column_groups)$lengths)
+    gaps_col <- gaps_col[-length(gaps_col)]
+
+    heatmap_height <- max(config$figure_height, 3 + n_heatmap * 0.2)
+    heatmap_width <- max(config$figure_width, ncol(heatmap_matrix) * 0.2) + 4
+
+    if (isTRUE(config$save_png)) {
+
+        pheatmap::pheatmap(
+            heatmap_matrix,
+            scale = "row",
+            cluster_rows = isTRUE(config$cluster_rows),
+            cluster_cols = FALSE,
+            gaps_col = gaps_col,
+            annotation_col = annotation_col,
+            show_colnames = FALSE,
+            main = "Top Variable KEGG Pathway Activity (GSVA) - Top Dose Per Compound",
+            filename = file.path(figure_dir, "Heatmap_GSVA_KEGG_top_pathways_top_dose.png"),
+            width = heatmap_width,
+            height = heatmap_height,
+            res = config$figure_dpi
+        )
+
+    }
+
+    if (isTRUE(config$save_pdf)) {
+
+        pheatmap::pheatmap(
+            heatmap_matrix,
+            scale = "row",
+            cluster_rows = isTRUE(config$cluster_rows),
+            cluster_cols = FALSE,
+            gaps_col = gaps_col,
+            annotation_col = annotation_col,
+            show_colnames = FALSE,
+            main = "Top Variable KEGG Pathway Activity (GSVA) - Top Dose Per Compound",
+            filename = file.path(figure_dir, "Heatmap_GSVA_KEGG_top_pathways_top_dose.pdf"),
+            width = heatmap_width,
+            height = heatmap_height
+        )
+
+    }
+
+    invisible(TRUE)
+
+}
+
+#===============================================================================
 # Run limma on GSVA Scores (Differential Pathway Activity per Contrast)
 #===============================================================================
 
@@ -470,6 +588,8 @@ run_gsva <- function(config, metadata, exclude_pattern = config$exclude_groups_p
     diff_results <- run_gsva_limma(gsva_scores, metadata, config, table_dir, figure_dir, label_pathways_by_group)
 
     save_gsva_heatmap(gsva_scores, metadata, config, figure_dir)
+
+    save_gsva_top_dose_heatmap(gsva_scores, metadata, config, figure_dir)
 
     message("GSVA complete.")
 

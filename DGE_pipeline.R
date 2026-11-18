@@ -43,8 +43,11 @@ source("R/ligand_group_venn.R")
 source("R/t007_curated_comparison.R")
 source("R/dose_concordance.R")
 source("R/enrichment.R")
+source("R/gsea.R")
+source("R/gsea_compound_correlation.R")
 source("R/pathway_specificity_comparison.R")
 source("R/gsva.R")
+source("R/maya.R")
 source("R/gsva_compound_correlation.R")
 source("R/pathway_downregulation_skew.R")
 source("R/gene_expression_skew.R")
@@ -210,6 +213,20 @@ if (isTRUE(config$run_umap)) {
 }
 
 #===============================================================================
+# Run UMAP on limma Batch-Corrected Expression
+#===============================================================================
+
+if (isTRUE(config$run_umap_batch_corrected)) {
+
+    umap_batch_corrected_results <- run_umap_batch_corrected(
+        counts = counts,
+        metadata = metadata,
+        config = config
+    )
+
+}
+
+#===============================================================================
 # Run DESeq2
 #===============================================================================
 
@@ -351,6 +368,25 @@ if (
 }
 
 #===============================================================================
+# Run MAYA (Multi-Modal Pathway Activity, KEGG Gene Sets)
+#===============================================================================
+#
+# EXPERIMENTAL: MAYA was designed and validated for single-cell RNA-seq;
+# applying it to bulk samples is a methodological stretch, not a validated
+# use case. See R/maya.R header for details.
+#===============================================================================
+
+if (isTRUE(config$run_maya)) {
+
+    maya_results <- run_maya(
+        counts = counts,
+        metadata = metadata,
+        config = config
+    )
+
+}
+
+#===============================================================================
 # Run GO / KEGG enrichment
 #===============================================================================
 
@@ -359,6 +395,31 @@ if (isTRUE(config$run_go) || isTRUE(config$run_kegg)) {
     enrichment_results <- run_enrichment(
         config = config,
         metadata = metadata
+    )
+
+}
+
+#===============================================================================
+# Run GO / KEGG GSEA
+#===============================================================================
+
+if (isTRUE(config$run_gsea)) {
+
+    gsea_results <- run_gsea(
+        config = config,
+        metadata = metadata
+    )
+
+}
+
+#===============================================================================
+# Run Compound-vs-Compound GSEA Pathway Correlation
+#===============================================================================
+
+if (isTRUE(config$run_gsea) && isTRUE(config$run_gsea_compound_correlation)) {
+
+    gsea_compound_correlation_results <- run_gsea_compound_correlation(
+        config = config
     )
 
 }

@@ -1,0 +1,294 @@
+################################################################################
+# RNAseqPipeline
+#
+# File: gsea.R
+#
+# Description:
+#   GO and KEGG gene set enrichment analysis (GSEA) per DESeq2 contrast,
+#   ranking the full gene list by DESeq2's Wald statistic ("stat" column)
+#   rather than thresholding to a significant-gene list first (contrast
+#   with the over-representation analysis in R/enrichment.R). Uses
+#   clusterProfiler::gseGO/gseKEGG (fgsea under the hood). Reuses
+#   get_organism_db()/get_kegg_organism_code() from R/enrichment.R.
+#
+#   Reads "*_raw.csv" DESeq2 result tables, not "*_shrunk.csv" -- the
+#   shrunk tables (written only when config$lfc_shrinkage = TRUE) don't
+#   carry a "stat" column at all (apeglm shrinkage doesn't produce a Wald
+#   statistic), so "_raw.csv" is the only table GSEA can rank from, and
+#   it's also the one DESeq2 always writes regardless of the shrinkage
+#   setting.
+#
+################################################################################
+
+#===============================================================================
+# Build a Ranked Gene Vector (Ensembl ID -> DESeq2 Wald Statistic)
+#===============================================================================
+
+build_ranked_gene_vector <- function(results_table, gene_col = "gene", stat_col = "stat") {
+
+    df <- results_table[!is.na(results_table[[stat_col]]), ]
+
+    ranked <- df[[stat_col]]
+
+    names(ranked) <- df[[gene_col]]
+
+    ranked <- ranked[!duplicated(names(ranked))]
+
+    sort(ranked, decreasing = TRUE)
+
+}
+
+#===============================================================================
+# Map a Ranked Ensembl Vector to ENTREZID for gseKEGG
+#===============================================================================
+#
+# bitr() is frequently one-to-many; collapse to one row per ENTREZID by
+# keeping the mapped ENSEMBL entry with the largest |stat|, then re-sort.
+#===============================================================================
+
+build_ranked_entrez_vector <- function(ranked_gene_vector, org_pkg) {
+
+    org_db <- get(org_pkg, envir = asNamespace(org_pkg))
+
+    id_map <- suppressMessages(
+        clusterProfiler::bitr(
+            names(ranked_gene_vector), fromType = "ENSEMBL", toType = "ENTREZID", OrgDb = org_db
+        )
+    )
+
+    if (nrow(id_map) == 0) {
+        return(numeric(0))
+    }
+
+    id_map$stat <- ranked_gene_vector[id_map$ENSEMBL]
+
+    id_map <- id_map[order(abs(id_map$stat), decreasing = TRUE), ]
+
+    id_map <- id_map[!duplicated(id_map$ENTREZID), ]
+
+    ranked <- id_map$stat
+
+    names(ranked) <- id_map$ENTREZID
+
+    sort(ranked, decreasing = TRUE)
+
+}
+
+#===============================================================================
+# Run GO GSEA
+#===============================================================================
+
+run_gsea_go <- function(ranked_gene_vector, org_pkg, ont, config) {
+
+    org_db <- get(org_pkg, envir = asNamespace(org_pkg))
+
+    # seed = TRUE below saves/restores .Random.seed internally, which
+    # errors ("object '.Random.seed' not found") if no RNG call has ever
+    # happened yet in this R session -- set.seed() here both avoids that
+    # and makes the result reproducible from config$random_seed.
+    set.seed(config$random_seed)
+
+    tryCatch(
+        clusterProfiler::gseGO(
+            geneList = ranked_gene_vector,
+            ont = ont,
+            OrgDb = org_db,
+            keyType = "ENSEMBL",
+            minGSSize = config$gsea_min_gene_set_size,
+            maxGSSize = config$gsea_max_gene_set_size,
+            pvalueCutoff = config$alpha,
+            pAdjustMethod = "BH",
+            seed = TRUE,
+            verbose = FALSE
+        ),
+        error = function(e) {
+            warning("GO GSEA failed: ", conditionMessage(e))
+            NULL
+        }
+    )
+
+}
+
+#===============================================================================
+# Run KEGG GSEA
+#===============================================================================
+
+run_gsea_kegg <- function(ranked_entrez_vector, kegg_organism, config) {
+
+    if (length(ranked_entrez_vector) == 0) {
+        return(NULL)
+    }
+
+    set.seed(config$random_seed)
+
+    tryCatch(
+        clusterProfiler::gseKEGG(
+            geneList = ranked_entrez_vector,
+            organism = kegg_organism,
+            keyType = "kegg",
+            minGSSize = config$gsea_min_gene_set_size,
+            maxGSSize = config$gsea_max_gene_set_size,
+            pvalueCutoff = config$alpha,
+            pAdjustMethod = "BH",
+            seed = TRUE,
+            verbose = FALSE
+        ),
+        error = function(e) {
+            warning("KEGG GSEA failed: ", conditionMessage(e))
+            NULL
+        }
+    )
+
+}
+
+#===============================================================================
+# Save a GSEA Result (Table + Dotplot)
+#===============================================================================
+
+save_gsea_result <- function(result, filename_base, table_dir, figure_dir, config) {
+
+    if (is.null(result)) {
+        return(invisible(FALSE))
+    }
+
+    result_df <- as.data.frame(result)
+
+    save_csv(result_df, file.path(table_dir, paste0(filename_base, ".csv")), row.names = FALSE)
+
+    if (nrow(result_df) == 0) {
+        return(invisible(FALSE))
+    }
+
+    n_show <- min(20, nrow(result_df))
+
+    dot_plot <- enrichplot::dotplot(result, showCategory = n_show) +
+        ggplot2::ggtitle(gsub("_", " ", filename_base))
+
+    plot_height <- max(config$figure_height, n_show * 0.5)
+
+    if (isTRUE(config$save_png)) {
+
+        ggplot2::ggsave(
+            file.path(figure_dir, paste0(filename_base, "_dotplot.png")),
+            plot = dot_plot, width = config$figure_width, height = plot_height, dpi = config$figure_dpi
+        )
+
+    }
+
+    if (isTRUE(config$save_pdf)) {
+
+        ggplot2::ggsave(
+            file.path(figure_dir, paste0(filename_base, "_dotplot.pdf")),
+            plot = dot_plot, width = config$figure_width, height = plot_height
+        )
+
+    }
+
+    invisible(TRUE)
+
+}
+
+#===============================================================================
+# Process GSEA for One Group (GO + KEGG)
+#===============================================================================
+
+process_gsea_group <- function(
+    group_label, raw_results_table, org_pkg, kegg_organism, config,
+    go_table_dir, go_figure_dir, kegg_table_dir, kegg_figure_dir
+) {
+
+    ranked_gene_vector <- build_ranked_gene_vector(raw_results_table)
+
+    message("Processing GSEA: ", group_label, " (", length(ranked_gene_vector), " ranked genes)")
+
+    go_result <- run_gsea_go(ranked_gene_vector, org_pkg, config$go_ontology, config)
+
+    save_gsea_result(go_result, paste0("GSEA_GO_", group_label), go_table_dir, go_figure_dir, config)
+
+    ranked_entrez_vector <- build_ranked_entrez_vector(ranked_gene_vector, org_pkg)
+
+    kegg_result <- run_gsea_kegg(ranked_entrez_vector, kegg_organism, config)
+
+    save_gsea_result(kegg_result, paste0("GSEA_KEGG_", group_label), kegg_table_dir, kegg_figure_dir, config)
+
+    data.frame(
+        group = group_label,
+        n_ranked_genes = length(ranked_gene_vector),
+        n_go_terms = if (!is.null(go_result)) nrow(as.data.frame(go_result)) else 0,
+        n_kegg_terms = if (!is.null(kegg_result)) nrow(as.data.frame(kegg_result)) else 0,
+        stringsAsFactors = FALSE
+    )
+
+}
+
+#===============================================================================
+# Run GO / KEGG GSEA
+#===============================================================================
+
+run_gsea <- function(config, metadata, exclude_pattern = config$exclude_groups_pattern) {
+
+    message("Running GO/KEGG GSEA...")
+
+    if (!requireNamespace("clusterProfiler", quietly = TRUE)) {
+        stop("Package 'clusterProfiler' is required.")
+    }
+
+    org_pkg <- get_organism_db(config$organism)
+
+    kegg_organism <- get_kegg_organism_code(config$organism)
+
+    groups <- setdiff(levels(factor(metadata$group)), config$reference_group)
+
+    if (!is.null(exclude_pattern) && nzchar(exclude_pattern)) {
+
+        excluded <- groups[grepl(exclude_pattern, groups)]
+
+        if (length(excluded) > 0) {
+            message("Excluding groups matching '", exclude_pattern, "': ", paste(excluded, collapse = ", "))
+        }
+
+        groups <- groups[!grepl(exclude_pattern, groups)]
+
+    }
+
+    go_table_dir <- file.path(config$output_directory, "GSEA", "GO", "Tables")
+    go_figure_dir <- file.path(config$output_directory, "GSEA", "GO", "Figures")
+    kegg_table_dir <- file.path(config$output_directory, "GSEA", "KEGG", "Tables")
+    kegg_figure_dir <- file.path(config$output_directory, "GSEA", "KEGG", "Figures")
+
+    for (d in c(go_table_dir, go_figure_dir, kegg_table_dir, kegg_figure_dir)) {
+        dir.create(d, recursive = TRUE, showWarnings = FALSE)
+    }
+
+    summary_rows <- list()
+
+    for (group in groups) {
+
+        deseq2_file <- file.path(
+            config$output_directory, "DESeq2", "Tables",
+            paste0("DESeq2_group_", group, "_vs_", config$reference_group, "_raw.csv")
+        )
+
+        if (!file.exists(deseq2_file)) {
+            warning("No DESeq2 raw results found for group: ", group, "; skipping GSEA.")
+            next
+        }
+
+        results_table <- utils::read.csv(deseq2_file)
+
+        summary_rows[[length(summary_rows) + 1]] <- process_gsea_group(
+            group, results_table, org_pkg, kegg_organism, config,
+            go_table_dir, go_figure_dir, kegg_table_dir, kegg_figure_dir
+        )
+
+    }
+
+    summary_table <- do.call(rbind, summary_rows)
+
+    save_csv(summary_table, file.path(config$output_directory, "GSEA", "gsea_summary.csv"), row.names = FALSE)
+
+    message("GO/KEGG GSEA complete.")
+
+    return(summary_table)
+
+}

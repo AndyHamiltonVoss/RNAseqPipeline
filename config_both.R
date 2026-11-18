@@ -28,10 +28,13 @@
 #   R/prepare_combined_experiment_data.R for the full derivation); this
 #   version is rank 8 of 8.
 #
-#   Only run_deseq2 is enabled -- every other module (QC, saturation curve,
-#   UMAP, compound similarity, GO/KEGG, GSVA, etc.) assumes a full
+#   run_deseq2 and run_umap are enabled; every other module (QC, saturation
+#   curve, compound similarity, GO/KEGG, GSVA, etc.) assumes a full
 #   single-experiment dataset and isn't meaningful for this 42-sample,
-#   four-contrast reproducibility check.
+#   four-contrast reproducibility check. UMAP is the exception: it only
+#   needs counts/metadata, computes its own VST, and colors by the
+#   5-level "group" column, which already encodes both drug identity and
+#   experiment -- a useful view of batch structure/reproducibility.
 #
 #   Run via:
 #       Rscript DGE_pipeline.R config_both.R
@@ -147,7 +150,12 @@ config <- list(
 
     run_control_plate_correlation = FALSE,
 
-    run_umap = FALSE,
+    run_umap = TRUE,
+
+    # limma::removeBatchEffect(batch = library, design = ~ group) on the
+    # same VST matrix, to check whether the batch structure seen in the
+    # uncorrected UMAP is a library/experiment artifact.
+    run_umap_batch_corrected = TRUE,
 
     run_deseq2 = TRUE,
 
@@ -163,7 +171,13 @@ config <- list(
 
     run_gsea = FALSE,
 
+    run_gsea_compound_correlation = FALSE,
+
     run_gsva = FALSE,
+
+    run_maya = FALSE,
+
+    run_maya_differential = FALSE,
 
     run_gsva_compound_correlation = FALSE,
 

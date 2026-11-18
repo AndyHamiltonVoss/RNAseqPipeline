@@ -135,9 +135,15 @@ config <- list(
 
     run_gsea = FALSE,
 
+    run_gsea_compound_correlation = FALSE,
+
     run_pathway_specificity_comparison = FALSE,
 
     run_gsva = TRUE,
+
+    run_maya = FALSE,
+
+    run_maya_differential = FALSE,
 
     run_gsva_compound_correlation = FALSE,
 

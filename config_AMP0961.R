@@ -157,11 +157,17 @@ config <- list(
 
     run_kegg = TRUE,
 
-    run_gsea = FALSE,
+    run_gsea = TRUE,
+
+    run_gsea_compound_correlation = TRUE,
 
     run_pathway_specificity_comparison = TRUE,
 
     run_gsva = TRUE,
+
+    run_maya = TRUE,
+
+    run_maya_differential = TRUE,
 
     run_gsva_compound_correlation = TRUE,
 
@@ -182,6 +188,15 @@ config <- list(
 
 
     #---------------------------------------------------------------------------
+    # GSEA (Gene Set Enrichment Analysis)
+    #---------------------------------------------------------------------------
+
+    gsea_min_gene_set_size = 10,
+
+    gsea_max_gene_set_size = 500,
+
+
+    #---------------------------------------------------------------------------
     # GSVA (Gene Set Variation Analysis)
     #---------------------------------------------------------------------------
 
@@ -194,6 +209,13 @@ config <- list(
     gsva_heatmap_top_pathways = 30,
 
     gsva_pairwise_comparisons = list(),
+
+
+    #---------------------------------------------------------------------------
+    # MAYA (Pathway Activity, EXPERIMENTAL on bulk data -- see R/maya.R)
+    #---------------------------------------------------------------------------
+
+    maya_heatmap_top_modes = 30,
 
 
     #---------------------------------------------------------------------------
