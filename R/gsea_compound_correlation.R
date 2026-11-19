@@ -380,6 +380,121 @@ run_gsea_pathway_family_correlation <- function(config, pathway_family, gsea_dir
     }
 
     #===========================================================================
+    # Pathway-Level Compound PCA
+    #===========================================================================
+    #
+    # stats::prcomp() on the compound x pathway NES matrix (transposed
+    # nes_matrix), mirroring R/qc.R's sample-level PCA (same
+    # pca_center/pca_scale config) but at the compound level and on
+    # pathway NES scores instead of gene expression. Most meaningful on a
+    # "*_Dense" directory (complete NES profile, no NA pathways); on a
+    # significant-only directory, NA cells (pathway not significant for
+    # that compound) are imputed to 0 ("no enrichment signal") since
+    # prcomp() cannot handle NA input.
+    #===========================================================================
+
+    if (length(compounds) >= 4) {
+
+        pca_input <- as.matrix(nes_matrix)
+        pca_input[is.na(pca_input)] <- 0
+
+        pca <- stats::prcomp(
+            t(pca_input),
+            center = isTRUE(config$pca_center),
+            scale. = isTRUE(config$pca_scale)
+        )
+
+        variance_explained <- (pca$sdev^2) / sum(pca$sdev^2) * 100
+
+        pca_scores <- as.data.frame(pca$x)
+        pca_scores$compound <- rownames(pca_scores)
+
+        save_csv(
+            pca_scores,
+            file.path(table_dir, paste0("compound_gsea_", pathway_family, "_pathway_pca.csv")),
+            row.names = FALSE
+        )
+
+        save_csv(
+            data.frame(
+                PC = paste0("PC", seq_along(variance_explained)),
+                percent_variance = variance_explained
+            ),
+            file.path(table_dir, paste0("compound_gsea_", pathway_family, "_pathway_pca_variance_explained.csv")),
+            row.names = FALSE
+        )
+
+        if (requireNamespace("ggplot2", quietly = TRUE)) {
+
+            pca_plot <- ggplot2::ggplot(pca_scores, ggplot2::aes(x = PC1, y = PC2)) +
+                ggplot2::geom_point(size = 3, alpha = 0.85, color = "steelblue") +
+                ggplot2::labs(
+                    title = paste0("Compound PCA: ", gsea_label, " ", pathway_family, " Pathway NES Profile (Top Dose)"),
+                    x = sprintf("PC1 (%.1f%% variance)", variance_explained[1]),
+                    y = sprintf("PC2 (%.1f%% variance)", variance_explained[2])
+                ) +
+                ggplot2::theme_bw()
+
+            if (requireNamespace("ggrepel", quietly = TRUE)) {
+                pca_plot <- pca_plot + ggrepel::geom_text_repel(ggplot2::aes(label = compound), size = 3.2)
+            } else {
+                pca_plot <- pca_plot + ggplot2::geom_text(ggplot2::aes(label = compound), size = 3.2, vjust = -1)
+            }
+
+            scree_data <- data.frame(
+                PC = factor(seq_along(variance_explained), levels = seq_along(variance_explained)),
+                percent_variance = variance_explained
+            )
+
+            scree_plot <- ggplot2::ggplot(
+                utils::head(scree_data, 10),
+                ggplot2::aes(x = PC, y = percent_variance)
+            ) +
+                ggplot2::geom_col(fill = "#1b9e77") +
+                ggplot2::labs(
+                    title = paste0(gsea_label, " ", pathway_family, " Pathway PCA Scree Plot"),
+                    x = "Principal Component",
+                    y = "Percent Variance Explained"
+                ) +
+                ggplot2::theme_bw()
+
+            if (isTRUE(config$save_png)) {
+
+                ggplot2::ggsave(
+                    file.path(figure_dir, paste0("Compound_GSEA_", pathway_family, "_pathway_pca.png")),
+                    plot = pca_plot, width = config$figure_width, height = config$figure_height, dpi = config$figure_dpi
+                )
+
+                ggplot2::ggsave(
+                    file.path(figure_dir, paste0("Compound_GSEA_", pathway_family, "_pathway_pca_scree.png")),
+                    plot = scree_plot, width = config$figure_width, height = config$figure_height, dpi = config$figure_dpi
+                )
+
+            }
+
+            if (isTRUE(config$save_pdf)) {
+
+                ggplot2::ggsave(
+                    file.path(figure_dir, paste0("Compound_GSEA_", pathway_family, "_pathway_pca.pdf")),
+                    plot = pca_plot, width = config$figure_width, height = config$figure_height
+                )
+
+                ggplot2::ggsave(
+                    file.path(figure_dir, paste0("Compound_GSEA_", pathway_family, "_pathway_pca_scree.pdf")),
+                    plot = scree_plot, width = config$figure_width, height = config$figure_height
+                )
+
+            }
+
+        }
+
+    } else {
+
+        pca_scores <- NULL
+
+    }
+
+    #===========================================================================
     # Leading-Edge (core_enrichment) Gene Overlap for Shared Significant
     # Pathways
     #===========================================================================
@@ -510,6 +625,7 @@ run_gsea_pathway_family_correlation <- function(config, pathway_family, gsea_dir
         correlation_matrix = correlation_matrix,
         jaccard_up_matrix = jaccard_up_matrix,
         jaccard_down_matrix = jaccard_down_matrix,
+        pca_scores = pca_scores,
         leading_edge_up_matrix = leading_edge_up_matrix,
         leading_edge_down_matrix = leading_edge_down_matrix
     )
