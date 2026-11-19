@@ -46,6 +46,7 @@ source("R/enrichment.R")
 source("R/enrichment_compound_correlation.R")
 source("R/gsea.R")
 source("R/gsea_compound_correlation.R")
+source("R/gsea_pathway_dose_response.R")
 source("R/pathway_specificity_comparison.R")
 source("R/gsva.R")
 source("R/maya.R")
@@ -485,6 +486,27 @@ if (isTRUE(config$run_gsea) && isTRUE(config$run_gsea_compound_correlation)) {
 if (isTRUE(config$run_gsea_lfc) && isTRUE(config$run_gsea_lfc_compound_correlation)) {
 
     gsea_lfc_compound_correlation_results <- run_gsea_compound_correlation(
+        config = config,
+        gsea_dir = "GSEA_LFC"
+    )
+
+}
+
+#===============================================================================
+# Run GSEA Pathway Dose-Response (Bidirectional Pathways)
+#===============================================================================
+#
+# For pathways where different compounds NES in opposite directions, plots
+# NES vs. dose per compound to check whether the direction is
+# dose-dependent. Reads GSEA_LFC (significant-only, so low doses can show
+# gaps where a pathway wasn't yet significant) -- re-point gsea_dir at
+# "GSEA_LFC_Dense" once a full all-dose dense GSEA run exists, with no
+# code change needed (see R/gsea_pathway_dose_response.R header).
+#===============================================================================
+
+if (isTRUE(config$run_gsea_lfc) && isTRUE(config$run_gsea_pathway_dose_response)) {
+
+    gsea_pathway_dose_response_results <- run_gsea_pathway_dose_response_all(
         config = config,
         gsea_dir = "GSEA_LFC"
     )

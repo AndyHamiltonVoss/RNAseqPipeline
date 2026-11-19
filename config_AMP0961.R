@@ -173,6 +173,11 @@ config <- list(
 
     run_gsea_lfc_compound_correlation = TRUE,
 
+    # See R/gsea_pathway_dose_response.R header: plots NES vs. dose per
+    # compound for the pathways with the strongest cross-compound sign
+    # split at top dose, to check whether the split is dose-dependent.
+    run_gsea_pathway_dose_response = TRUE,
+
     # See R/gsea.R header: writes every tested GO/KEGG pathway (not just
     # significant ones) to a sibling GSEA_Dense/GSEA_LFC_Dense directory,
     # at no extra compute cost (confirmed empirically -- pvalueCutoff is a
@@ -232,6 +237,15 @@ config <- list(
     # Number of most-variable (by NES across compounds) pathways to show
     # in the pathway x compound NES heatmap.
     gsea_nes_heatmap_top_pathways = 30,
+
+    # Number of pathways with the strongest cross-compound NES sign split
+    # (max(NES) * min(NES) most negative) to plot NES-vs-dose for.
+    gsea_bidirectional_top_pathways = 20,
+
+    # Number of pathways with the "cleanest" dose-response divergence
+    # (compounds clustered at a similar NES at their lowest dose, split
+    # into clearly up/down groups by their top dose) to plot.
+    gsea_divergence_top_pathways = 20,
 
 
     #---------------------------------------------------------------------------
