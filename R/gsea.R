@@ -30,6 +30,24 @@
 #       a contrast missing its "_shrunk.csv" is skipped with a warning,
 #       same as a missing "_raw.csv" already is for rank_by = "stat".
 #
+#   config$run_gsea_dense also controls whether a DENSE pass is written
+#   alongside the normal significant-only one. gseGO()/gseKEGG() are
+#   called with pvalueCutoff = 1 instead of config$alpha (clusterProfiler
+#   applies pvalueCutoff as a post-hoc filter on an already-fully-computed
+#   fgsea result, so this costs no extra time -- confirmed empirically on
+#   real AMP0961 data: the dense call was actually slightly faster, and
+#   its p.adjust/NES values exactly reproduce the significant-only call's
+#   when re-filtered to p.adjust < alpha). The significant-only CSV/dotplot
+#   written to Output_<dir>/GSEA[_LFC]/ is unchanged either way; the dense
+#   table (every tested pathway, no dotplot) is written to a sibling
+#   Output_<dir>/GSEA[_LFC]_Dense/ directory with the same per-group
+#   filenames, so R/gsea_compound_correlation.R can read it via its
+#   existing gsea_dir parameter with no further changes -- a dense NES
+#   profile is what makes the NES Pearson correlation there statistically
+#   sound (apples-to-apples across compounds, like R/gsva_compound_correlation.R's
+#   dense design), instead of being computed only over each compound
+#   pair's shared significant terms.
+#
 ################################################################################
 
 #===============================================================================
@@ -109,7 +127,7 @@ run_gsea_go <- function(ranked_gene_vector, org_pkg, ont, config) {
             keyType = "ENSEMBL",
             minGSSize = config$gsea_min_gene_set_size,
             maxGSSize = config$gsea_max_gene_set_size,
-            pvalueCutoff = config$alpha,
+            pvalueCutoff = if (isTRUE(config$run_gsea_dense)) 1 else config$alpha,
             pAdjustMethod = "BH",
             seed = TRUE,
             verbose = FALSE
@@ -141,7 +159,7 @@ run_gsea_kegg <- function(ranked_entrez_vector, kegg_organism, config) {
             keyType = "kegg",
             minGSSize = config$gsea_min_gene_set_size,
             maxGSSize = config$gsea_max_gene_set_size,
-            pvalueCutoff = config$alpha,
+            pvalueCutoff = if (isTRUE(config$run_gsea_dense)) 1 else config$alpha,
             pAdjustMethod = "BH",
             seed = TRUE,
             verbose = FALSE
@@ -155,10 +173,39 @@ run_gsea_kegg <- function(ranked_entrez_vector, kegg_organism, config) {
 }
 
 #===============================================================================
+# Split a Dense GSEA Result into Its Significant Subset
+#===============================================================================
+#
+# When config$run_gsea_dense is TRUE, run_gsea_go()/run_gsea_kegg() are
+# called with pvalueCutoff = 1, so "result" already contains every tested
+# pathway. This re-derives the significant-only view (p.adjust < alpha)
+# that the rest of the pipeline (gsea_summary.csv term counts, the
+# dotplot, and the compound-correlation Jaccard logic) expects, by
+# subsetting the @result slot directly -- confirmed empirically to
+# reproduce a pvalueCutoff = alpha run's output exactly (same IDs, 0 diff
+# in p.adjust/NES on a real AMP0961 group).
+#===============================================================================
+
+split_gsea_result_by_significance <- function(result, alpha) {
+
+    if (is.null(result)) {
+        return(list(significant = NULL, dense = result))
+    }
+
+    significant <- result
+    significant@result <- significant@result[
+        !is.na(significant@result$p.adjust) & significant@result$p.adjust < alpha,
+    ]
+
+    list(significant = significant, dense = result)
+
+}
+
+#===============================================================================
 # Save a GSEA Result (Table + Dotplot)
 #===============================================================================
 
-save_gsea_result <- function(result, filename_base, table_dir, figure_dir, config) {
+save_gsea_result <- function(result, filename_base, table_dir, figure_dir, config, make_dotplot = TRUE) {
 
     if (is.null(result)) {
         return(invisible(FALSE))
@@ -168,7 +215,7 @@ save_gsea_result <- function(result, filename_base, table_dir, figure_dir, confi
 
     save_csv(result_df, file.path(table_dir, paste0(filename_base, ".csv")), row.names = FALSE)
 
-    if (nrow(result_df) == 0) {
+    if (nrow(result_df) == 0 || !isTRUE(make_dotplot)) {
         return(invisible(FALSE))
     }
 
@@ -208,22 +255,53 @@ save_gsea_result <- function(result, filename_base, table_dir, figure_dir, confi
 process_gsea_group <- function(
     group_label, raw_results_table, org_pkg, kegg_organism, config,
     go_table_dir, go_figure_dir, kegg_table_dir, kegg_figure_dir,
-    stat_col = "stat"
+    stat_col = "stat",
+    go_dense_table_dir = NULL, kegg_dense_table_dir = NULL
 ) {
 
     ranked_gene_vector <- build_ranked_gene_vector(raw_results_table, stat_col = stat_col)
 
     message("Processing GSEA: ", group_label, " (", length(ranked_gene_vector), " ranked genes)")
 
-    go_result <- run_gsea_go(ranked_gene_vector, org_pkg, config$go_ontology, config)
+    go_result_raw <- run_gsea_go(ranked_gene_vector, org_pkg, config$go_ontology, config)
 
-    save_gsea_result(go_result, paste0("GSEA_GO_", group_label), go_table_dir, go_figure_dir, config)
+    if (isTRUE(config$run_gsea_dense)) {
+
+        split_go <- split_gsea_result_by_significance(go_result_raw, config$alpha)
+
+        save_gsea_result(split_go$significant, paste0("GSEA_GO_", group_label), go_table_dir, go_figure_dir, config)
+        save_gsea_result(split_go$dense, paste0("GSEA_GO_", group_label), go_dense_table_dir, NA, config, make_dotplot = FALSE)
+
+        go_result <- split_go$significant
+
+    } else {
+
+        save_gsea_result(go_result_raw, paste0("GSEA_GO_", group_label), go_table_dir, go_figure_dir, config)
+
+        go_result <- go_result_raw
+
+    }
 
     ranked_entrez_vector <- build_ranked_entrez_vector(ranked_gene_vector, org_pkg)
 
-    kegg_result <- run_gsea_kegg(ranked_entrez_vector, kegg_organism, config)
+    kegg_result_raw <- run_gsea_kegg(ranked_entrez_vector, kegg_organism, config)
 
-    save_gsea_result(kegg_result, paste0("GSEA_KEGG_", group_label), kegg_table_dir, kegg_figure_dir, config)
+    if (isTRUE(config$run_gsea_dense)) {
+
+        split_kegg <- split_gsea_result_by_significance(kegg_result_raw, config$alpha)
+
+        save_gsea_result(split_kegg$significant, paste0("GSEA_KEGG_", group_label), kegg_table_dir, kegg_figure_dir, config)
+        save_gsea_result(split_kegg$dense, paste0("GSEA_KEGG_", group_label), kegg_dense_table_dir, NA, config, make_dotplot = FALSE)
+
+        kegg_result <- split_kegg$significant
+
+    } else {
+
+        save_gsea_result(kegg_result_raw, paste0("GSEA_KEGG_", group_label), kegg_table_dir, kegg_figure_dir, config)
+
+        kegg_result <- kegg_result_raw
+
+    }
 
     data.frame(
         group = group_label,
@@ -290,6 +368,23 @@ run_gsea <- function(
         dir.create(d, recursive = TRUE, showWarnings = FALSE)
     }
 
+    # Dense pass (every tested pathway, not just significant ones) --
+    # feeds a statistically sound NES correlation in
+    # gsea_compound_correlation.R. Empirically confirmed on real AMP0961
+    # data to cost no extra time vs. the significant-only call (same
+    # fgsea permutation test either way; pvalueCutoff is a post-hoc
+    # filter) and to reproduce the significant-only output exactly when
+    # re-filtered to p.adjust < alpha.
+    dense_output_subdir <- if (rank_by == "stat") "GSEA_Dense" else "GSEA_LFC_Dense"
+    go_dense_table_dir <- file.path(config$output_directory, dense_output_subdir, "GO", "Tables")
+    kegg_dense_table_dir <- file.path(config$output_directory, dense_output_subdir, "KEGG", "Tables")
+
+    if (isTRUE(config$run_gsea_dense)) {
+        for (d in c(go_dense_table_dir, kegg_dense_table_dir)) {
+            dir.create(d, recursive = TRUE, showWarnings = FALSE)
+        }
+    }
+
     summary_rows <- list()
 
     for (group in groups) {
@@ -309,7 +404,8 @@ run_gsea <- function(
         summary_rows[[length(summary_rows) + 1]] <- process_gsea_group(
             group, results_table, org_pkg, kegg_organism, config,
             go_table_dir, go_figure_dir, kegg_table_dir, kegg_figure_dir,
-            stat_col = stat_col
+            stat_col = stat_col,
+            go_dense_table_dir = go_dense_table_dir, kegg_dense_table_dir = kegg_dense_table_dir
         )
 
     }

@@ -171,6 +171,25 @@ config <- list(
 
     run_gsea_compound_correlation = TRUE,
 
+    run_gsea_lfc_compound_correlation = TRUE,
+
+    # See R/gsea.R header: writes every tested GO/KEGG pathway (not just
+    # significant ones) to a sibling GSEA_Dense/GSEA_LFC_Dense directory,
+    # at no extra compute cost (confirmed empirically -- pvalueCutoff is a
+    # post-hoc filter on an already-fully-computed fgsea result). Feeds a
+    # statistically sound NES correlation below, instead of one computed
+    # only over each compound pair's shared significant terms.
+    run_gsea_dense = TRUE,
+
+    run_gsea_dense_compound_correlation = TRUE,
+
+    run_gsea_lfc_dense_compound_correlation = TRUE,
+
+    # See R/gsea_compound_correlation.R header: for pathways two compounds
+    # both call significant, checks whether the same core_enrichment genes
+    # are actually driving it, not just whether the pathway ID matches.
+    run_gsea_leading_edge_correlation = TRUE,
+
     run_pathway_specificity_comparison = TRUE,
 
     run_gsva = TRUE,
@@ -184,6 +203,11 @@ config <- list(
     run_pathway_downregulation_skew = TRUE,
 
     run_gene_vs_pathway_comparison = TRUE,
+
+    # See R/pathway_consensus_correlation.R header: combines the Jaccard
+    # outputs of GSVA + GSEA + ORA (GSVA KEGG-only) into one consensus
+    # compound-similarity view plus a method-agreement diagnostic.
+    run_pathway_consensus_correlation = TRUE,
 
 
     #---------------------------------------------------------------------------
@@ -204,6 +228,20 @@ config <- list(
     gsea_min_gene_set_size = 10,
 
     gsea_max_gene_set_size = 500,
+
+    # Number of most-variable (by NES across compounds) pathways to show
+    # in the pathway x compound NES heatmap.
+    gsea_nes_heatmap_top_pathways = 30,
+
+
+    #---------------------------------------------------------------------------
+    # Pathway Consensus (Cross-Method Compound-Similarity Agreement)
+    #---------------------------------------------------------------------------
+
+    # A compound-pair cell needs at least this many methods' Jaccard
+    # values present to compute a consensus/agreement value there,
+    # otherwise NA. GO pairs max out at 2 (GSEA + ORA, no GSVA).
+    pathway_consensus_min_methods = 2,
 
 
     #---------------------------------------------------------------------------

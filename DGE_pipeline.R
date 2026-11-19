@@ -53,6 +53,7 @@ source("R/gsva_compound_correlation.R")
 source("R/pathway_downregulation_skew.R")
 source("R/gene_expression_skew.R")
 source("R/gene_vs_pathway_correlation_comparison.R")
+source("R/pathway_consensus_correlation.R")
 source("R/logging.R")
 
 #===============================================================================
@@ -470,6 +471,85 @@ if (isTRUE(config$run_gsea_lfc)) {
 if (isTRUE(config$run_gsea) && isTRUE(config$run_gsea_compound_correlation)) {
 
     gsea_compound_correlation_results <- run_gsea_compound_correlation(
+        config = config,
+        gsea_dir = "GSEA"
+    )
+
+}
+
+#===============================================================================
+# Run Compound-vs-Compound GSEA Pathway Correlation, Ranked by Shrunken
+# log2FoldChange
+#===============================================================================
+
+if (isTRUE(config$run_gsea_lfc) && isTRUE(config$run_gsea_lfc_compound_correlation)) {
+
+    gsea_lfc_compound_correlation_results <- run_gsea_compound_correlation(
+        config = config,
+        gsea_dir = "GSEA_LFC"
+    )
+
+}
+
+#===============================================================================
+# Run Compound-vs-Compound GSEA Pathway Correlation, Dense (All Tested
+# Pathways, Not Just Significant) -- Statistically Sound NES Correlation
+#===============================================================================
+#
+# See R/gsea.R header: config$run_gsea_dense makes run_gsea() also write a
+# dense per-group table (every tested pathway, not just p.adjust < alpha)
+# to a sibling GSEA_Dense/ or GSEA_LFC_Dense/ directory. Pointed there
+# instead of GSEA/GSEA_LFC, the NES Pearson correlation below is computed
+# over every compound's full pathway profile (apples-to-apples, like
+# R/gsva_compound_correlation.R), not just each pair's shared significant
+# terms -- see R/gsea_compound_correlation.R header for the distortion
+# this avoids.
+#===============================================================================
+
+if (
+    isTRUE(config$run_gsea) && isTRUE(config$run_gsea_dense) &&
+    isTRUE(config$run_gsea_dense_compound_correlation)
+) {
+
+    gsea_dense_compound_correlation_results <- run_gsea_compound_correlation(
+        config = config,
+        gsea_dir = "GSEA_Dense"
+    )
+
+}
+
+if (
+    isTRUE(config$run_gsea_lfc) && isTRUE(config$run_gsea_dense) &&
+    isTRUE(config$run_gsea_lfc_dense_compound_correlation)
+) {
+
+    gsea_lfc_dense_compound_correlation_results <- run_gsea_compound_correlation(
+        config = config,
+        gsea_dir = "GSEA_LFC_Dense"
+    )
+
+}
+
+#===============================================================================
+# Run Cross-Method (GSVA + GSEA + ORA) Pathway-Level Compound-Similarity
+# Consensus
+#===============================================================================
+#
+# Reads already-written Jaccard CSVs from the GSVA / GSEA / enrichment
+# compound-correlation modules above; GSVA's KEGG-only files are picked up
+# automatically if present but are not required -- R/pathway_consensus_correlation.R
+# degrades gracefully via file.exists() checks when a method's file is
+# missing (always true for GSVA + GO, which has no GSVA gene sets).
+#===============================================================================
+
+if (
+    isTRUE(config$run_gsea) && isTRUE(config$run_gsea_compound_correlation) &&
+    (isTRUE(config$run_go) || isTRUE(config$run_kegg)) &&
+    isTRUE(config$run_enrichment_compound_correlation) &&
+    isTRUE(config$run_pathway_consensus_correlation)
+) {
+
+    pathway_consensus_correlation_results <- run_pathway_consensus_correlation(
         config = config
     )
 

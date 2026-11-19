@@ -143,6 +143,16 @@ config <- list(
 
     run_gsea_compound_correlation = FALSE,
 
+    run_gsea_lfc_compound_correlation = FALSE,
+
+    run_gsea_dense = FALSE,
+
+    run_gsea_dense_compound_correlation = FALSE,
+
+    run_gsea_lfc_dense_compound_correlation = FALSE,
+
+    run_gsea_leading_edge_correlation = FALSE,
+
     run_pathway_specificity_comparison = FALSE,
 
     run_gsva = TRUE,
@@ -156,6 +166,10 @@ config <- list(
     run_pathway_downregulation_skew = FALSE,
 
     run_gene_vs_pathway_comparison = FALSE,
+
+    run_pathway_consensus_correlation = FALSE,
+
+    pathway_consensus_min_methods = 2,
 
 
     #---------------------------------------------------------------------------
