@@ -137,11 +137,21 @@ config <- list(
 
     run_gene_expression_skew = TRUE,
 
+    # See R/gene_rank_overlap.R header: cross-compound Jaccard overlap of
+    # top-N ranked up/down genes, swept across N.
+    run_gene_rank_overlap = TRUE,
+
     run_ligand_group_venn = TRUE,
 
     run_t007_curated_comparison = TRUE,
 
     run_control_plate_correlation = TRUE,
+
+    # See R/library_effect_diagnostic.R header: quantifies how much of
+    # each compound's apparent vs-Control signal overlaps with a "pure
+    # plate effect" estimated from Control-only library-vs-library
+    # contrasts.
+    run_library_effect_diagnostic = TRUE,
 
     run_umap = TRUE,
 
@@ -207,6 +217,11 @@ config <- list(
 
     run_pathway_downregulation_skew = TRUE,
 
+    # See R/geneset_direction_mix.R header: how many KEGG pathways
+    # contain both significant up- and down-regulated member genes at
+    # once, per compound, and what that internal split looks like.
+    run_geneset_direction_mix = TRUE,
+
     run_gene_vs_pathway_comparison = TRUE,
 
     # See R/pathway_consensus_correlation.R header: combines the Jaccard
@@ -256,6 +271,18 @@ config <- list(
     # values present to compute a consensus/agreement value there,
     # otherwise NA. GO pairs max out at 2 (GSEA + ORA, no GSVA).
     pathway_consensus_min_methods = 2,
+
+
+    #---------------------------------------------------------------------------
+    # Gene Rank Overlap (Cross-Compound Top-N Up/Down Gene Consistency)
+    #---------------------------------------------------------------------------
+
+    # Representative N for the single compound x compound Jaccard heatmap.
+    gene_rank_overlap_n = 500,
+
+    # Range of N swept for the threshold-agnostic mean-Jaccard-vs-N plot;
+    # 2976 = 25% of the ~11905-gene universe (top quartile).
+    gene_rank_overlap_n_sweep = c(50, 100, 250, 500, 1000, 2000, 2976),
 
 
     #---------------------------------------------------------------------------

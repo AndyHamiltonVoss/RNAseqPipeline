@@ -150,6 +150,8 @@ config <- list(
 
     run_control_plate_correlation = FALSE,
 
+    run_library_effect_diagnostic = FALSE,
+
     run_umap = TRUE,
 
     # limma::removeBatchEffect(batch = library, design = ~ group) on the

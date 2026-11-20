@@ -30,6 +30,7 @@ source("R/saturation.R")
 source("R/ercc_qc.R")
 source("R/umap.R")
 source("R/deseq2.R")
+source("R/library_effect_diagnostic.R")
 source("R/control_plate_correlation.R")
 source("R/edger.R")
 source("R/limma.R")
@@ -49,10 +50,12 @@ source("R/gsea_compound_correlation.R")
 source("R/gsea_pathway_dose_response.R")
 source("R/pathway_specificity_comparison.R")
 source("R/gsva.R")
+source("R/geneset_direction_mix.R")
 source("R/maya.R")
 source("R/gsva_compound_correlation.R")
 source("R/pathway_downregulation_skew.R")
 source("R/gene_expression_skew.R")
+source("R/gene_rank_overlap.R")
 source("R/gene_vs_pathway_correlation_comparison.R")
 source("R/pathway_consensus_correlation.R")
 source("R/logging.R")
@@ -241,6 +244,12 @@ if (isTRUE(config$run_umap_top_dose)) {
         config = config
     )
 
+    umap_top_dose_by_library_results <- run_umap_top_dose_by_library(
+        counts = counts,
+        metadata = metadata,
+        config = config
+    )
+
 }
 
 #===============================================================================
@@ -265,6 +274,33 @@ if (isTRUE(config$run_deseq2) && isTRUE(config$run_control_plate_correlation)) {
 
     control_plate_correlation_results <- run_control_plate_correlation(
         normalized_counts = deseq2_results$normalized_counts,
+        metadata = metadata,
+        config = config
+    )
+
+}
+
+#===============================================================================
+# Run Library/Plate-Effect Diagnostic
+#===============================================================================
+#
+# See R/library_effect_diagnostic.R header: quantifies how much of each
+# compound's apparent vs-Control signal overlaps with a "pure plate
+# effect" estimated from Control-only, library-vs-library DESeq2
+# contrasts (Control is the only group spread across all 10 libraries).
+# Needs run_deseq2()'s per-compound CSVs already written to disk.
+#===============================================================================
+
+if (isTRUE(config$run_deseq2) && isTRUE(config$run_library_effect_diagnostic)) {
+
+    library_effect_results <- run_library_effect_diagnostic(
+        counts = counts,
+        metadata = metadata,
+        config = config
+    )
+
+    control_library_pca_results <- run_control_library_pca(
+        counts = counts,
         metadata = metadata,
         config = config
     )
@@ -302,6 +338,24 @@ if (isTRUE(config$run_deseq2) && isTRUE(config$run_compound_similarity)) {
 if (isTRUE(config$run_deseq2) && isTRUE(config$run_gene_expression_skew)) {
 
     gene_expression_skew_results <- run_gene_expression_skew(
+        config = config
+    )
+
+}
+
+#===============================================================================
+# Run Gene Rank Overlap Diagnostic
+#===============================================================================
+#
+# See R/gene_rank_overlap.R header: cross-compound Jaccard overlap of
+# top-N ranked up/down genes, swept across N (threshold-agnostic,
+# extends compound_similarity.R's significance-based "up-Jaccard >>
+# down-Jaccard" finding).
+#===============================================================================
+
+if (isTRUE(config$run_deseq2) && isTRUE(config$run_gene_rank_overlap)) {
+
+    gene_rank_overlap_results <- run_gene_rank_overlap(
         config = config
     )
 
@@ -363,6 +417,26 @@ if (isTRUE(config$run_gsva) && isTRUE(config$run_gsva_compound_correlation)) {
 if (isTRUE(config$run_gsva) && isTRUE(config$run_pathway_downregulation_skew)) {
 
     pathway_downregulation_skew_results <- run_pathway_downregulation_skew(
+        config = config
+    )
+
+}
+
+#===============================================================================
+# Run Gene Set Direction Mix Diagnostic (KEGG)
+#===============================================================================
+#
+# See R/geneset_direction_mix.R header: for each compound, checks how
+# many KEGG pathways contain BOTH significant up- and down-regulated
+# member genes at once ("Mixed"), and what that internal split looks
+# like -- a further, independent reason to treat pathway-level
+# directionality calls cautiously when a pathway turns out to be mostly
+# internally split rather than coherently one-directional.
+#===============================================================================
+
+if (isTRUE(config$run_deseq2) && isTRUE(config$run_geneset_direction_mix)) {
+
+    geneset_direction_mix_results <- run_geneset_direction_mix(
         config = config
     )
 

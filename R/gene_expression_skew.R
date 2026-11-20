@@ -189,6 +189,59 @@ run_gene_expression_skew <- function(config) {
         ggplot2::theme_bw()
 
     #===========================================================================
+    # Plot: Per-Compound log2FoldChange Histogram (Magnitude of Skew)
+    #===========================================================================
+    #
+    # Same long_data as panel2's pooled histogram, but faceted one panel
+    # per compound (ordered the same most-negative-skewed-first order as
+    # panel1) with each compound's OWN median vline, rather than the
+    # single pooled median -- shows the MAGNITUDE of each drug's own
+    # shift, not just the %negative/%positive sign summary.
+    #===========================================================================
+
+    per_compound_median <- do.call(rbind, lapply(compounds, function(cmpd) {
+        data.frame(compound = cmpd, median_log2FoldChange = stats::median(long_data$log2FoldChange[long_data$compound == cmpd]))
+    }))
+
+    long_data$compound <- factor(long_data$compound, levels = pct_negative_df$compound)
+    per_compound_median$compound <- factor(per_compound_median$compound, levels = pct_negative_df$compound)
+
+    gene_lfc_histogram <- ggplot2::ggplot(long_data, ggplot2::aes(x = log2FoldChange)) +
+        ggplot2::geom_histogram(bins = 60, fill = "steelblue", color = NA) +
+        ggplot2::geom_vline(xintercept = 0, linetype = "dashed", color = "grey30") +
+        ggplot2::geom_vline(
+            data = per_compound_median,
+            ggplot2::aes(xintercept = median_log2FoldChange),
+            linetype = "dotted", color = "firebrick"
+        ) +
+        ggplot2::coord_cartesian(xlim = c(-2, 2)) +
+        ggplot2::facet_wrap(~compound) +
+        ggplot2::labs(
+            title = "Gene-level log2FoldChange Distribution by Compound (Top Dose)",
+            subtitle = "Ordered by % negative (most down-skewed first, same order as the bar chart above); dashed = 0, dotted = that compound's own median",
+            x = "log2FoldChange (vs. reference group)", y = "Gene count"
+        ) +
+        ggplot2::theme_bw() +
+        ggplot2::theme(strip.text = ggplot2::element_text(size = 8))
+
+    histogram_width <- max(config$figure_width, 14)
+    histogram_height <- max(config$figure_height, 11)
+
+    if (isTRUE(config$save_png)) {
+        ggplot2::ggsave(
+            file.path(diagnostic_dir, "Gene_LFC_histogram_by_compound.png"),
+            plot = gene_lfc_histogram, width = histogram_width, height = histogram_height, dpi = config$figure_dpi
+        )
+    }
+
+    if (isTRUE(config$save_pdf)) {
+        ggplot2::ggsave(
+            file.path(diagnostic_dir, "Gene_LFC_histogram_by_compound.pdf"),
+            plot = gene_lfc_histogram, width = histogram_width, height = histogram_height
+        )
+    }
+
+    #===========================================================================
     # Combine and Save
     #===========================================================================
 
@@ -225,7 +278,9 @@ run_gene_expression_skew <- function(config) {
         list(
             pct_negative_by_compound = pct_negative_df,
             pct_long_by_compound = pct_long_df,
-            pooled_summary = pooled_summary
+            pooled_summary = pooled_summary,
+            per_compound_median = per_compound_median,
+            gene_lfc_histogram = gene_lfc_histogram
         )
     )
 

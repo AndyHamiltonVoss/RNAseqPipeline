@@ -119,6 +119,8 @@ config <- list(
 
     run_control_plate_correlation = TRUE,
 
+    run_library_effect_diagnostic = FALSE,
+
     run_umap = TRUE,
 
     run_umap_top_dose = FALSE,
