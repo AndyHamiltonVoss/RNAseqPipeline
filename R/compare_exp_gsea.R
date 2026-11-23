@@ -1306,3 +1306,319 @@ run_compare_exp_gsea_all <- function(max_pathways = 40) {
     invisible(NULL)
 
 }
+
+#===============================================================================
+# Combined Cross-Experiment Pathway NES Clustering for the Repeated
+# Drugs (Rosi, MRL24, GW1929)
+#===============================================================================
+#
+# Reads the NES column directly from the already-saved, significant-only
+# GSEA_KEGG_<source>_<label>.csv files in
+# results/compare_exp/<drug>/GSEA_LFC_<alpha>/Tables/ (written by
+# run_compare_exp_gsea()) -- does not recompute anything, and does not
+# build any combined expression matrix the way the gene/pathway UMAP in
+# R/compare_exp_umap.R does. Every one of those files is already a
+# single drug-dose-vs-that-experiment's-own-local-control contrast (NES
+# is computed by ranking on log2FoldChange relative to each experiment's
+# own reference group), so there is no separate "control" row to handle
+# here -- a given source simply has no file/row for a group that doesn't
+# exist (e.g. AMP0786 has no GW1929 data at all).
+#
+# Only the significant-only files are read (not a dense recomputation
+# like run_compare_exp_gsea_pathway_correlation()'s per-compound
+# version), so a pathway/source cell with no significant hit there is
+# NA, not 0 -- correlation uses pairwise.complete.obs accordingly. This
+# mirrors the same "significant-only correlation is less stable than a
+# dense one" caveat already documented for compare_exp's other
+# correlation work; flagged here for transparency, not silently hidden.
+#===============================================================================
+
+read_saved_gsea_kegg_long <- function(drug, alpha = 0.05, output_dir = "results/compare_exp") {
+
+    table_dir <- file.path(output_dir, drug, sprintf("GSEA_LFC_%s", alpha), "Tables")
+
+    files <- list.files(table_dir, pattern = "^GSEA_KEGG_.*\\.csv$")
+
+    if (length(files) == 0) {
+        warning("No saved GSEA_KEGG files found for ", drug, " in ", table_dir)
+        return(data.frame(source_group = character(0), ID = character(0), Description = character(0), NES = numeric(0)))
+    }
+
+    rows <- lapply(files, function(f) {
+
+        df <- utils::read.csv(file.path(table_dir, f))
+
+        if (nrow(df) == 0) {
+            return(NULL)
+        }
+
+        label <- sub("^GSEA_KEGG_", "", sub("\\.csv$", "", f))
+
+        data.frame(
+            source_group = label,
+            ID = df$ID, Description = df$Description, NES = df$NES,
+            stringsAsFactors = FALSE
+        )
+
+    })
+
+    do.call(rbind, rows[!vapply(rows, is.null, logical(1))])
+
+}
+
+#===============================================================================
+# Build the Combined, Dense (All Tested Pathways) NES Matrix for a Set
+# of Repeated Drugs -- Shared by the Correlation Heatmap and the UMAP
+#===============================================================================
+#
+# One column per (source, dose-group) -- e.g. "AMP0786_Rosi_1000nM",
+# "external_Rosi_vs_DMSO_24h" -- across every drug in `drugs`. Dense =
+# every tested pathway, not just the significant ones, needed for a
+# non-saturated correlation/embedding (see
+# run_compare_exp_repeated_drug_nes_clustering()'s header).
+#===============================================================================
+
+build_combined_dense_nes_matrix <- function(
+    drugs = c("Rosi", "MRL24", "GW1929"),
+    drug_args = list(
+        Rosi = list(amp0786_doses = c("1nM", "10nM", "100nM", "1000nM"), amp0961_doses = c("0.125nM", "2.5nM", "50nM", "1000nM"), include_external = TRUE),
+        MRL24 = list(amp0786_doses = c("1nM", "10nM", "100nM", "1000nM"), amp0961_doses = c("0.0125nM", "0.25nM", "5nM", "100nM"), include_external = TRUE),
+        GW1929 = list(amp0786_doses = character(0), amp0961_doses = c("0.0125nM", "0.25nM", "5nM", "100nM"), include_external = TRUE)
+    ),
+    external_path = "/mnt/d/DRUGseq/ref/1-s2.0-S0026895X24018340-mmc4-992_supp_datafile2_24h.xlsx",
+    amp0786_dir = "results/AMP0786/DESeq2/Tables",
+    amp0961_dir = "results/AMP0961/DESeq2/Tables",
+    alpha = 0.05
+) {
+
+    if (!requireNamespace("clusterProfiler", quietly = TRUE)) {
+        stop("Package 'clusterProfiler' is required.")
+    }
+
+    org_pkg <- get_organism_db("human")
+    kegg_organism <- get_kegg_organism_code("human")
+    gsea_config <- make_gsea_config_stub(alpha)
+
+    per_source_pathway <- list()
+
+    for (drug in drugs) {
+
+        args <- drug_args[[drug]]
+
+        sources <- get_compare_exp_gsea_sources(
+            drug, args$amp0786_doses, args$amp0961_doses, external_path, amp0786_dir, amp0961_dir, args$include_external
+        )
+
+        for (src in sources) {
+
+            label <- paste0(src$source_label, "_", src$label)
+
+            message(sprintf("Running dense GSEA KEGG: %s...", label))
+
+            gsea_result <- run_gsea_kegg_for_source(
+                src$results_table, src$gene_col, "log2FoldChange", src$from_type, org_pkg, kegg_organism, gsea_config
+            )
+
+            if (is.null(gsea_result$dense)) {
+                next
+            }
+
+            result_df <- as.data.frame(gsea_result$dense)
+
+            per_source_pathway[[label]] <- data.frame(ID = result_df$ID, NES = result_df$NES, stringsAsFactors = FALSE)
+
+        }
+
+    }
+
+    source_names <- names(per_source_pathway)
+
+    message(sprintf("Dense NES computed for %d source_groups.", length(source_names)))
+
+    nes_matrix <- Reduce(
+        function(a, b) merge(a, b, by = "ID", all = TRUE),
+        lapply(source_names, function(nm) {
+            df <- per_source_pathway[[nm]]
+            names(df)[2] <- nm
+            df
+        })
+    )
+
+    rownames(nes_matrix) <- nes_matrix$ID
+    nes_matrix$ID <- NULL
+
+    as.matrix(nes_matrix[, source_names, drop = FALSE])
+
+}
+
+#===============================================================================
+# Parse a source_group Label (e.g. "AMP0786_Rosi_1000nM",
+# "external_GW1929_vs_DMSO_24h") Into (source, compound) for Plot
+# Color/Shape
+#===============================================================================
+
+parse_source_group_label <- function(source_group, drugs) {
+
+    source_label <- ifelse(startsWith(source_group, "external_"), "external", sub("_.*$", "", source_group))
+
+    compound <- vapply(source_group, function(g) {
+        hit <- drugs[vapply(drugs, function(d) grepl(paste0("(^|_)", d, "(_|$)"), g), logical(1))]
+        if (length(hit) == 0) NA_character_ else hit[1]
+    }, character(1))
+
+    data.frame(sample = source_group, source = source_label, compound = unname(compound), stringsAsFactors = FALSE)
+
+}
+
+run_compare_exp_repeated_drug_nes_clustering <- function(
+    drugs = c("Rosi", "MRL24", "GW1929"),
+    drug_args = list(
+        Rosi = list(amp0786_doses = c("1nM", "10nM", "100nM", "1000nM"), amp0961_doses = c("0.125nM", "2.5nM", "50nM", "1000nM"), include_external = TRUE),
+        MRL24 = list(amp0786_doses = c("1nM", "10nM", "100nM", "1000nM"), amp0961_doses = c("0.0125nM", "0.25nM", "5nM", "100nM"), include_external = TRUE),
+        GW1929 = list(amp0786_doses = character(0), amp0961_doses = c("0.0125nM", "0.25nM", "5nM", "100nM"), include_external = TRUE)
+    ),
+    external_path = "/mnt/d/DRUGseq/ref/1-s2.0-S0026895X24018340-mmc4-992_supp_datafile2_24h.xlsx",
+    amp0786_dir = "results/AMP0786/DESeq2/Tables",
+    amp0961_dir = "results/AMP0961/DESeq2/Tables",
+    alpha = 0.05,
+    nes_output_dir = "results/compare_exp/NES_comparison",
+    figure_width = 12,
+    figure_height = 11,
+    figure_dpi = 600,
+    save_png = TRUE,
+    save_pdf = TRUE
+) {
+
+    message(sprintf("Running combined cross-experiment pathway NES clustering (%s, dense)...", paste(drugs, collapse = ", ")))
+
+    if (!requireNamespace("pheatmap", quietly = TRUE)) {
+        stop("Package 'pheatmap' is required.")
+    }
+
+    nes_matrix <- build_combined_dense_nes_matrix(drugs, drug_args, external_path, amp0786_dir, amp0961_dir, alpha)
+
+    correlation_matrix <- stats::cor(nes_matrix, method = "pearson", use = "pairwise.complete.obs")
+
+    table_dir <- file.path(nes_output_dir, "Tables")
+    figure_dir <- file.path(nes_output_dir, "Figures")
+
+    dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
+    dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
+
+    file_tag <- paste(tolower(drugs), collapse = "_")
+
+    save_csv(nes_matrix, file.path(table_dir, paste0("repeated_drug_nes_matrix_", file_tag, ".csv")))
+    save_csv(correlation_matrix, file.path(table_dir, paste0("repeated_drug_nes_correlation_", file_tag, ".csv")))
+
+    can_cluster <- !anyNA(correlation_matrix)
+
+    if (!can_cluster) {
+        message("Some source-group pairs share no tested pathways in common (NA correlation); disabling heatmap clustering.")
+    }
+
+    heatmap_height <- max(figure_height, ncol(correlation_matrix) * 0.35)
+    heatmap_width <- heatmap_height + 2
+
+    for (ext in c("png", "pdf")) {
+
+        save_this_ext <- if (ext == "png") isTRUE(save_png) else isTRUE(save_pdf)
+
+        if (!save_this_ext) {
+            next
+        }
+
+        args <- list(
+            correlation_matrix,
+            cluster_rows = can_cluster, cluster_cols = can_cluster,
+            display_numbers = TRUE, number_format = "%.2f", fontsize_number = 7,
+            main = sprintf(
+                "Cross-Experiment Pathway NES Correlation: %s (Dense, All Tested Pathways)",
+                paste(drugs, collapse = ", ")
+            ),
+            filename = file.path(figure_dir, paste0("repeated_drug_nes_correlation_heatmap_", file_tag, ".", ext)),
+            width = heatmap_width, height = heatmap_height
+        )
+
+        if (ext == "png") {
+            args$res <- figure_dpi
+        }
+
+        do.call(pheatmap::pheatmap, args)
+
+    }
+
+    message("Combined cross-experiment pathway NES clustering complete.")
+
+    list(nes_matrix = nes_matrix, correlation_matrix = correlation_matrix)
+
+}
+
+#===============================================================================
+# Combined Cross-Experiment Pathway UMAP -- NES-Based, Replaces the
+# GSVA-Score-Based Pathway UMAP in R/compare_exp_umap.R
+#===============================================================================
+#
+# One point per (source, dose-group) -- NOT per sample, unlike the
+# gene-level UMAP in R/compare_exp_umap.R, since NES only exists at the
+# contrast level (it's the output of one gseKEGG run on one ranked
+# drug-vs-local-control vector, not a per-sample score). Only ~20-25
+# points total for 3 drugs, so this is a much smaller embedding than the
+# 209-sample gene-level UMAP -- shown for direct comparability with
+# run_compare_exp_repeated_drug_nes_clustering()'s heatmap/dendrogram,
+# not because a UMAP is the most natural tool for this few points.
+#
+# Reuses build_combined_dense_nes_matrix() (same dense NES computation
+# as the correlation heatmap) and run_umap_with_shape() from
+# R/compare_exp_umap.R (source that file first) for the actual
+# embedding/plot, so both UMAPs look and save identically.
+#===============================================================================
+
+run_compare_exp_repeated_drug_nes_umap <- function(
+    drugs = c("Rosi", "MRL24", "GW1929"),
+    drug_args = list(
+        Rosi = list(amp0786_doses = c("1nM", "10nM", "100nM", "1000nM"), amp0961_doses = c("0.125nM", "2.5nM", "50nM", "1000nM"), include_external = TRUE),
+        MRL24 = list(amp0786_doses = c("1nM", "10nM", "100nM", "1000nM"), amp0961_doses = c("0.0125nM", "0.25nM", "5nM", "100nM"), include_external = TRUE),
+        GW1929 = list(amp0786_doses = character(0), amp0961_doses = c("0.0125nM", "0.25nM", "5nM", "100nM"), include_external = TRUE)
+    ),
+    external_path = "/mnt/d/DRUGseq/ref/1-s2.0-S0026895X24018340-mmc4-992_supp_datafile2_24h.xlsx",
+    amp0786_dir = "results/AMP0786/DESeq2/Tables",
+    amp0961_dir = "results/AMP0961/DESeq2/Tables",
+    alpha = 0.05,
+    nes_output_dir = "results/compare_exp/NES_comparison",
+    n_neighbors = 5,
+    min_dist = 0.1,
+    random_seed = 1234,
+    figure_width = 9,
+    figure_height = 7,
+    figure_dpi = 600,
+    save_png = TRUE,
+    save_pdf = TRUE
+) {
+
+    message(sprintf("Running combined cross-experiment pathway NES UMAP (%s, dense)...", paste(drugs, collapse = ", ")))
+
+    if (!requireNamespace("uwot", quietly = TRUE)) {
+        stop("Package 'uwot' is required.")
+    }
+
+    if (!requireNamespace("ggplot2", quietly = TRUE)) {
+        stop("Package 'ggplot2' is required.")
+    }
+
+    nes_matrix <- build_combined_dense_nes_matrix(drugs, drug_args, external_path, amp0786_dir, amp0961_dir, alpha)
+
+    group_metadata <- parse_source_group_label(colnames(nes_matrix), drugs)
+
+    result <- run_umap_with_shape(
+        nes_matrix, group_metadata,
+        sprintf("Cross-Experiment Pathway UMAP: KEGG NES (%s, Dense)", paste(drugs, collapse = ", ")),
+        paste0("repeated_drug_nes_", paste(tolower(drugs), collapse = "_")),
+        nes_output_dir, n_neighbors, min_dist, random_seed,
+        figure_width, figure_height, figure_dpi, save_png, save_pdf
+    )
+
+    message("Combined cross-experiment pathway NES UMAP complete.")
+
+    result
+
+}
