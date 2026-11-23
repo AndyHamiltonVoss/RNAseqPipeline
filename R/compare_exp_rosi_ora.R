@@ -289,7 +289,7 @@ run_compare_exp_rosi_ora <- function(
     amp0786_dir = "results/AMP0786/DESeq2/Tables",
     amp0961_dir = "results/AMP0961/DESeq2/Tables",
     include_external = TRUE,
-    output_dir = file.path("results/compare_exp", compound),
+    output_dir = file.path("results/compare_exp", compound, sprintf("ORA_%s", alpha)),
     alpha = 0.05,
     figure_width = 8,
     figure_height = 6,
@@ -384,7 +384,7 @@ run_compare_exp_pathway_correlation <- function(
     amp0786_dir = "results/AMP0786/DESeq2/Tables",
     amp0961_dir = "results/AMP0961/DESeq2/Tables",
     include_external = TRUE,
-    output_dir = file.path("results/compare_exp", compound),
+    output_dir = file.path("results/compare_exp", compound, sprintf("ORA_%s", alpha)),
     alpha = 0.05,
     figure_width = 8,
     figure_height = 6,
@@ -637,7 +637,7 @@ run_compare_exp_gene_correlation <- function(
     amp0786_dir = "results/AMP0786/DESeq2/Tables",
     amp0961_dir = "results/AMP0961/DESeq2/Tables",
     include_external = TRUE,
-    output_dir = file.path("results/compare_exp", compound),
+    output_dir = file.path("results/compare_exp", compound, sprintf("ORA_%s", alpha)),
     alpha = 0.05,
     figure_width = 8,
     figure_height = 6,
@@ -739,7 +739,8 @@ run_compare_exp_gene_correlation <- function(
 
 run_compare_exp_updown_scatter <- function(
     compound = "Rosi",
-    output_dir = file.path("results/compare_exp", compound),
+    alpha = 0.05,
+    output_dir = file.path("results/compare_exp", compound, sprintf("ORA_%s", alpha)),
     figure_width = 9,
     figure_height = 7,
     figure_dpi = 600,
@@ -872,7 +873,7 @@ run_compare_exp_updown_gene_counts <- function(
     amp0786_dir = "results/AMP0786/DESeq2/Tables",
     amp0961_dir = "results/AMP0961/DESeq2/Tables",
     include_external = TRUE,
-    output_dir = file.path("results/compare_exp", compound),
+    output_dir = file.path("results/compare_exp", compound, sprintf("ORA_%s", alpha)),
     alpha = 0.05,
     figure_width = 9,
     figure_height = 6,
@@ -1051,8 +1052,8 @@ get_amp0961_all_compound_top_dose_sources <- function(
 run_amp0961_compound_null_baseline <- function(
     amp0961_dir = "results/AMP0961/DESeq2/Tables",
     reference_group = "Control",
-    output_dir = "results/compare_exp/concordance_proof",
     alpha = 0.05,
+    output_dir = file.path("results/compare_exp/concordance_proof", sprintf("ORA_%s", alpha)),
     figure_width = 10,
     figure_height = 9,
     figure_dpi = 600,
@@ -1204,8 +1205,9 @@ run_amp0961_compound_null_baseline <- function(
 #===============================================================================
 
 run_compare_exp_concordance_proof <- function(
+    alpha = 0.05,
     output_dir = "results/compare_exp",
-    null_baseline_dir = "results/compare_exp/concordance_proof",
+    null_baseline_dir = file.path("results/compare_exp/concordance_proof", sprintf("ORA_%s", alpha)),
     figure_width = 9,
     figure_height = 7,
     figure_dpi = 600,
@@ -1243,7 +1245,7 @@ run_compare_exp_concordance_proof <- function(
     percentile_rank <- function(x, distribution) mean(distribution <= x, na.rm = TRUE) * 100
 
     compound_output_dir <- function(compound) {
-        file.path(output_dir, compound)
+        file.path(output_dir, compound, sprintf("ORA_%s", alpha))
     }
 
     read_corr_value <- function(compound, filename, a, b) {
@@ -1367,5 +1369,249 @@ run_compare_exp_concordance_proof <- function(
     message("Concordance proof complete.")
 
     proof_table
+
+}
+
+#===============================================================================
+# Ordered (source_label, label, x_label) List for a Compound -- Labels
+# Only, No File Reads -- Fixes the Dot Plot's x-Axis Order
+#===============================================================================
+#
+# Same source ordering as get_compare_exp_sources() (external, then
+# AMP0786 doses low-to-high, then AMP0961 doses low-to-high, per the
+# order `amp0786_doses`/`amp0961_doses` are given in), but without
+# reading the external xlsx or any DESeq2 CSVs -- this is only used to
+# fix the x-axis category order/labels for run_compare_exp_kegg_dotplot(),
+# which reads already-saved KEGG result tables, not raw DESeq2 output.
+#===============================================================================
+
+get_compare_exp_source_labels <- function(
+    compound = "Rosi",
+    amp0786_doses = c("1nM", "10nM", "100nM", "1000nM"),
+    amp0961_doses = c("0.125nM", "2.5nM", "50nM", "1000nM"),
+    include_external = TRUE
+) {
+
+    labels <- list()
+
+    if (include_external) {
+        labels[[length(labels) + 1]] <- list(
+            source_label = "external", label = paste0(compound, "_vs_DMSO_24h"),
+            x_label = "External\n(vs DMSO)"
+        )
+    }
+
+    for (dose in amp0786_doses) {
+        labels[[length(labels) + 1]] <- list(
+            source_label = "AMP0786", label = paste0(compound, "_", dose),
+            x_label = paste0("AMP0786\n", dose)
+        )
+    }
+
+    for (dose in amp0961_doses) {
+        labels[[length(labels) + 1]] <- list(
+            source_label = "AMP0961", label = paste0(compound, "_", dose),
+            x_label = paste0("AMP0961\n", dose)
+        )
+    }
+
+    labels
+
+}
+
+#===============================================================================
+# KEGG Dot Plot: Pathway (y) x Dose/Experiment (x), Size = Gene Count,
+# Color = Adjusted p-Value
+#===============================================================================
+#
+# Reads the already-saved, per-source SIGNIFICANT-ONLY KEGG tables
+# run_compare_exp_rosi_ora() wrote (KEGG_<source_label>_<label>.csv in
+# results/compare_exp/<compound>/Tables/) -- does not rerun any KEGG
+# query. A missing dot for a given (pathway, source) cell means that
+# pathway wasn't significant there (padj < alpha, same cutoff
+# run_compare_exp_rosi_ora() already applied), not that it wasn't
+# tested -- same convention as a standard clusterProfiler dotplot,
+# extended here across multiple sources on one x-axis instead of one
+# result at a time.
+#
+# x-axis order is fixed, not alphabetical: external (if present), then
+# AMP0786 doses low-to-high, then AMP0961 doses low-to-high (per
+# get_compare_exp_source_labels()). Pathway (y-axis) set is the union of
+# every pathway significant in at least one source, ranked by how many
+# sources it's significant in (descending) then by its best p.adjust
+# (ascending), capped at `max_pathways` to keep the plot readable.
+#===============================================================================
+
+run_compare_exp_kegg_dotplot <- function(
+    compound = "Rosi",
+    amp0786_doses = c("1nM", "10nM", "100nM", "1000nM"),
+    amp0961_doses = c("0.125nM", "2.5nM", "50nM", "1000nM"),
+    include_external = TRUE,
+    alpha = 0.05,
+    output_dir = file.path("results/compare_exp", compound, sprintf("ORA_%s", alpha)),
+    max_pathways = 40,
+    figure_width = 10,
+    figure_height = 9,
+    figure_dpi = 600,
+    save_png = TRUE,
+    save_pdf = TRUE
+) {
+
+    message(sprintf("Running %s KEGG dot plot...", compound))
+
+    if (!requireNamespace("ggplot2", quietly = TRUE)) {
+        stop("Package 'ggplot2' is required.")
+    }
+
+    table_dir <- file.path(output_dir, "Tables")
+    figure_dir <- file.path(output_dir, "Figures")
+
+    source_labels <- get_compare_exp_source_labels(compound, amp0786_doses, amp0961_doses, include_external)
+
+    x_levels <- vapply(source_labels, function(s) s$x_label, character(1))
+
+    rows <- list()
+
+    for (src in source_labels) {
+
+        f <- file.path(table_dir, sprintf("KEGG_%s_%s.csv", src$source_label, src$label))
+
+        if (!file.exists(f)) {
+            warning("Missing KEGG result file (run run_compare_exp_rosi_ora() first?), skipping: ", f)
+            next
+        }
+
+        result_df <- utils::read.csv(f)
+
+        if (nrow(result_df) == 0) {
+            next
+        }
+
+        rows[[length(rows) + 1]] <- data.frame(
+            x_label = src$x_label,
+            Description = result_df$Description,
+            Count = result_df$Count,
+            p.adjust = result_df$p.adjust,
+            stringsAsFactors = FALSE
+        )
+
+    }
+
+    if (length(rows) == 0) {
+        stop("No significant KEGG results found for any source of ", compound, " -- nothing to plot.")
+    }
+
+    dot_table <- do.call(rbind, rows)
+
+    #===========================================================================
+    # Select Pathways: Significant in the Most Sources, Then Most
+    # Significant Overall, Capped at max_pathways
+    #===========================================================================
+
+    n_sources_by_pathway <- tapply(dot_table$x_label, dot_table$Description, function(x) length(unique(x)))
+    best_p_by_pathway <- tapply(dot_table$p.adjust, dot_table$Description, min)
+
+    pathway_summary <- data.frame(
+        Description = names(n_sources_by_pathway),
+        n_sources = as.integer(n_sources_by_pathway),
+        best_p = best_p_by_pathway[names(n_sources_by_pathway)],
+        stringsAsFactors = FALSE
+    )
+
+    pathway_summary <- pathway_summary[order(-pathway_summary$n_sources, pathway_summary$best_p), ]
+
+    selected_pathways <- utils::head(pathway_summary$Description, max_pathways)
+
+    dot_table <- dot_table[dot_table$Description %in% selected_pathways, ]
+
+    dot_table$x_label <- factor(dot_table$x_label, levels = x_levels)
+
+    # Top-to-bottom reading order = strongest-ranked pathway first;
+    # ggplot's discrete y-axis plots the first factor level at the
+    # BOTTOM by default, so the level order is reversed here to get that.
+    dot_table$Description <- factor(dot_table$Description, levels = rev(selected_pathways))
+
+    #===========================================================================
+    # Plot
+    #===========================================================================
+
+    n_pathways_shown <- length(selected_pathways)
+
+    dot_plot <- ggplot2::ggplot(dot_table, ggplot2::aes(x = x_label, y = Description, size = Count, color = p.adjust)) +
+        ggplot2::geom_point() +
+        ggplot2::scale_color_gradient(low = "red", high = "blue") +
+        ggplot2::scale_size_continuous(range = c(2, 9)) +
+        # drop = FALSE keeps a dose with zero significant pathways as a
+        # visibly empty column instead of silently vanishing from the
+        # axis (e.g. AMP0961 Rosi_0.125nM, 0 significant KEGG terms) --
+        # a dropped level there would look like that dose was never
+        # tested rather than just non-significant.
+        ggplot2::scale_x_discrete(drop = FALSE) +
+        ggplot2::labs(
+            title = sprintf("%s KEGG Pathway Enrichment Across Doses and Experiments", compound),
+            subtitle = paste0(
+                sprintf("Significant pathways (padj < %s) in at least one source\n", alpha),
+                sprintf("Top %d shown, ranked by breadth then significance", n_pathways_shown)
+            ),
+            x = NULL, y = NULL, size = "Gene count", color = "Adjusted\np-value"
+        ) +
+        ggplot2::theme_bw() +
+        ggplot2::theme(
+            axis.text.x = ggplot2::element_text(size = 8),
+            axis.text.y = ggplot2::element_text(size = 7),
+            panel.grid.major = ggplot2::element_line(color = "grey92")
+        )
+
+    dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
+    dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
+
+    save_csv(
+        dot_table[, c("x_label", "Description", "Count", "p.adjust")],
+        file.path(table_dir, sprintf("compare_exp_%s_kegg_dotplot.csv", tolower(compound))),
+        row.names = FALSE
+    )
+
+    plot_height <- max(figure_height, 2 + n_pathways_shown * 0.22)
+
+    if (isTRUE(save_png)) {
+        ggplot2::ggsave(
+            file.path(figure_dir, sprintf("Compare_exp_%s_kegg_dotplot.png", tolower(compound))),
+            plot = dot_plot, width = figure_width, height = plot_height, dpi = figure_dpi, limitsize = FALSE
+        )
+    }
+
+    if (isTRUE(save_pdf)) {
+        ggplot2::ggsave(
+            file.path(figure_dir, sprintf("Compare_exp_%s_kegg_dotplot.pdf", tolower(compound))),
+            plot = dot_plot, width = figure_width, height = plot_height, limitsize = FALSE
+        )
+    }
+
+    message(sprintf("%s KEGG dot plot complete.", compound))
+
+    list(dot_table = dot_table, plot = dot_plot)
+
+}
+
+#===============================================================================
+# KEGG Dot Plot for Every Compound Already Run Through compare_exp
+#===============================================================================
+
+run_compare_exp_kegg_dotplot_all <- function(max_pathways = 40) {
+
+    compound_args <- list(
+        list(compound = "Rosi", amp0786_doses = c("1nM", "10nM", "100nM", "1000nM"), amp0961_doses = c("0.125nM", "2.5nM", "50nM", "1000nM"), include_external = TRUE),
+        list(compound = "MRL24", amp0786_doses = c("1nM", "10nM", "100nM", "1000nM"), amp0961_doses = c("0.0125nM", "0.25nM", "5nM", "100nM"), include_external = TRUE),
+        list(compound = "GW1929", amp0786_doses = character(0), amp0961_doses = c("0.0125nM", "0.25nM", "5nM", "100nM"), include_external = TRUE),
+        list(compound = "T007", amp0786_doses = c("10uM"), amp0961_doses = c("1nM", "10nM", "100nM"), include_external = FALSE)
+    )
+
+    results <- lapply(compound_args, function(args) {
+        do.call(run_compare_exp_kegg_dotplot, c(args, list(max_pathways = max_pathways)))
+    })
+
+    names(results) <- vapply(compound_args, `[[`, character(1), "compound")
+
+    results
 
 }
