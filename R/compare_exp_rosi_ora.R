@@ -223,16 +223,21 @@ get_compare_exp_sources <- function(
     amp0961_doses = c("0.125nM", "2.5nM", "50nM", "1000nM"),
     external_path = "/mnt/d/DRUGseq/ref/1-s2.0-S0026895X24018340-mmc4-992_supp_datafile2_24h.xlsx",
     amp0786_dir = "Output/DESeq2/Tables",
-    amp0961_dir = "Output_AMP0961/DESeq2/Tables"
+    amp0961_dir = "Output_AMP0961/DESeq2/Tables",
+    include_external = TRUE
 ) {
 
     sources <- list()
 
-    sources[[length(sources) + 1]] <- list(
-        source_label = "external", label = paste0(compound, "_vs_DMSO_24h"),
-        results_table = read_external_compound_results(external_path, paste0(compound, "_vs_DMSO")),
-        gene_col = "gene", padj_col = "padj", from_type = "SYMBOL"
-    )
+    if (include_external) {
+
+        sources[[length(sources) + 1]] <- list(
+            source_label = "external", label = paste0(compound, "_vs_DMSO_24h"),
+            results_table = read_external_compound_results(external_path, paste0(compound, "_vs_DMSO")),
+            gene_col = "gene", padj_col = "padj", from_type = "SYMBOL"
+        )
+
+    }
 
     for (dose in amp0786_doses) {
 
@@ -283,6 +288,7 @@ run_compare_exp_rosi_ora <- function(
     external_path = "/mnt/d/DRUGseq/ref/1-s2.0-S0026895X24018340-mmc4-992_supp_datafile2_24h.xlsx",
     amp0786_dir = "Output/DESeq2/Tables",
     amp0961_dir = "Output_AMP0961/DESeq2/Tables",
+    include_external = TRUE,
     output_dir = "compare_exp",
     alpha = 0.05,
     figure_width = 8,
@@ -308,7 +314,7 @@ run_compare_exp_rosi_ora <- function(
     dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
     dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
 
-    sources <- get_compare_exp_sources(compound, amp0786_doses, amp0961_doses, external_path, amp0786_dir, amp0961_dir)
+    sources <- get_compare_exp_sources(compound, amp0786_doses, amp0961_doses, external_path, amp0786_dir, amp0961_dir, include_external)
 
     summary_rows <- list()
 
@@ -377,6 +383,7 @@ run_compare_exp_pathway_correlation <- function(
     external_path = "/mnt/d/DRUGseq/ref/1-s2.0-S0026895X24018340-mmc4-992_supp_datafile2_24h.xlsx",
     amp0786_dir = "Output/DESeq2/Tables",
     amp0961_dir = "Output_AMP0961/DESeq2/Tables",
+    include_external = TRUE,
     output_dir = "compare_exp",
     alpha = 0.05,
     figure_width = 8,
@@ -406,7 +413,7 @@ run_compare_exp_pathway_correlation <- function(
     dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
     dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
 
-    sources <- get_compare_exp_sources(compound, amp0786_doses, amp0961_doses, external_path, amp0786_dir, amp0961_dir)
+    sources <- get_compare_exp_sources(compound, amp0786_doses, amp0961_doses, external_path, amp0786_dir, amp0961_dir, include_external)
 
     source_names <- vapply(sources, function(s) paste0(s$source_label, "_", s$label), character(1))
 
@@ -629,6 +636,7 @@ run_compare_exp_gene_correlation <- function(
     external_path = "/mnt/d/DRUGseq/ref/1-s2.0-S0026895X24018340-mmc4-992_supp_datafile2_24h.xlsx",
     amp0786_dir = "Output/DESeq2/Tables",
     amp0961_dir = "Output_AMP0961/DESeq2/Tables",
+    include_external = TRUE,
     output_dir = "compare_exp",
     alpha = 0.05,
     figure_width = 8,
@@ -657,7 +665,7 @@ run_compare_exp_gene_correlation <- function(
     dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
     dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
 
-    sources <- get_compare_exp_sources(compound, amp0786_doses, amp0961_doses, external_path, amp0786_dir, amp0961_dir)
+    sources <- get_compare_exp_sources(compound, amp0786_doses, amp0961_doses, external_path, amp0786_dir, amp0961_dir, include_external)
 
     source_names <- vapply(sources, function(s) paste0(s$source_label, "_", s$label), character(1))
 
@@ -863,6 +871,7 @@ run_compare_exp_updown_gene_counts <- function(
     external_path = "/mnt/d/DRUGseq/ref/1-s2.0-S0026895X24018340-mmc4-992_supp_datafile2_24h.xlsx",
     amp0786_dir = "Output/DESeq2/Tables",
     amp0961_dir = "Output_AMP0961/DESeq2/Tables",
+    include_external = TRUE,
     output_dir = "compare_exp",
     alpha = 0.05,
     figure_width = 9,
@@ -891,7 +900,7 @@ run_compare_exp_updown_gene_counts <- function(
     dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
     dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
 
-    sources <- get_compare_exp_sources(compound, amp0786_doses, amp0961_doses, external_path, amp0786_dir, amp0961_dir)
+    sources <- get_compare_exp_sources(compound, amp0786_doses, amp0961_doses, external_path, amp0786_dir, amp0961_dir, include_external)
 
     source_names <- vapply(sources, function(s) paste0(s$source_label, "_", s$label), character(1))
 
@@ -960,5 +969,403 @@ run_compare_exp_updown_gene_counts <- function(
     message(sprintf("Cross-dataset %s up- vs. down-regulated selected gene counts complete.", compound))
 
     list(count_table = count_table, bar_plot = bar_plot)
+
+}
+
+#===============================================================================
+# Build Top-Dose Sources for Every AMP0961 Compound -- the "Different
+# Drug" Null Baseline for the Concordance Proof
+#===============================================================================
+#
+# Same top-dose discovery pattern as R/gene_rank_overlap.R /
+# R/gsea_compound_correlation.R (parse_dose_group() + which.max(dose_nM)
+# per compound, from R/dose_response.R), but surfaced here as its own
+# standalone sources list rather than folded into one of those modules,
+# since this one feeds the same (source_label, label, results_table,
+# gene_col, padj_col, from_type) shape get_compare_exp_sources() returns
+# -- every lower-level compare_exp helper (run_kegg_ora_dense(),
+# get_gene_lfc_by_entrez(), build_and_save_gene_lfc_correlation()) is
+# source-list-driven, not tied to get_compare_exp_sources() specifically,
+# so they all apply here unchanged.
+#===============================================================================
+
+get_amp0961_all_compound_top_dose_sources <- function(
+    amp0961_dir = "Output_AMP0961/DESeq2/Tables",
+    reference_group = "Control"
+) {
+
+    raw_files <- list.files(amp0961_dir, pattern = "^DESeq2_group_.*_raw\\.csv$")
+
+    group_names <- sub(
+        paste0("_vs_", reference_group, "_raw\\.csv$"), "",
+        sub("^DESeq2_group_", "", raw_files)
+    )
+
+    parsed <- lapply(group_names, parse_dose_group)
+    keep <- !vapply(parsed, is.null, logical(1))
+
+    dose_table <- data.frame(
+        group = group_names[keep],
+        compound = vapply(parsed[keep], `[[`, character(1), "compound"),
+        dose_nM = vapply(parsed[keep], `[[`, numeric(1), "dose_nM")
+    )
+
+    top_dose_table <- do.call(
+        rbind,
+        lapply(split(dose_table, dose_table$compound), function(d) d[which.max(d$dose_nM), ])
+    )
+
+    compounds <- sort(top_dose_table$compound)
+
+    lapply(compounds, function(cmpd) {
+
+        group <- top_dose_table$group[top_dose_table$compound == cmpd]
+        f <- file.path(amp0961_dir, paste0("DESeq2_group_", group, "_vs_", reference_group, "_raw.csv"))
+
+        list(
+            source_label = "AMP0961", label = cmpd,
+            results_table = utils::read.csv(f),
+            gene_col = "gene", padj_col = "padj", from_type = "ENSEMBL"
+        )
+
+    })
+
+}
+
+#===============================================================================
+# Run the "Different Drug" Null Baseline: All AMP0961 Compounds (Top
+# Dose), Pairwise KEGG Pathway and Selected-Gene log2FoldChange
+# Correlation
+#===============================================================================
+#
+# Part 2 of the pasted control-anchoring methodology: show that drugs
+# REPEATED across experiments (Rosi, MRL24, GW1929, T007 -- already
+# correlated against each other via compare_exp/<compound>/) correlate
+# more strongly than DIFFERENT drugs do within the same batch-corrected
+# screen. This builds that "different drug" null distribution across
+# every pair of AMP0961's ~20 compounds (top dose each), using the exact
+# same KEGG-ORA/gene-LFC methodology as the matched-drug comparisons, so
+# the two are directly comparable (see run_compare_exp_concordance_proof()).
+#===============================================================================
+
+run_amp0961_compound_null_baseline <- function(
+    amp0961_dir = "Output_AMP0961/DESeq2/Tables",
+    reference_group = "Control",
+    output_dir = "compare_exp/concordance_proof",
+    alpha = 0.05,
+    figure_width = 10,
+    figure_height = 9,
+    figure_dpi = 600,
+    save_png = TRUE,
+    save_pdf = TRUE
+) {
+
+    message("Running AMP0961 all-compound top-dose null baseline...")
+
+    if (!requireNamespace("clusterProfiler", quietly = TRUE)) {
+        stop("Package 'clusterProfiler' is required.")
+    }
+
+    if (!requireNamespace("pheatmap", quietly = TRUE)) {
+        stop("Package 'pheatmap' is required.")
+    }
+
+    org_pkg <- get_organism_db("human")
+    org_db <- get(org_pkg, envir = asNamespace(org_pkg))
+    kegg_organism <- get_kegg_organism_code("human")
+
+    table_dir <- file.path(output_dir, "Tables")
+    figure_dir <- file.path(output_dir, "Figures")
+
+    dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
+    dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
+
+    sources <- get_amp0961_all_compound_top_dose_sources(amp0961_dir, reference_group)
+    source_names <- vapply(sources, function(s) s$label, character(1))
+
+    message(sprintf("Null baseline across %d AMP0961 compounds (top dose each).", length(sources)))
+
+    #===========================================================================
+    # Dense KEGG Pathway Correlation
+    #===========================================================================
+
+    per_source_pathway <- lapply(sources, function(src) {
+
+        ora <- run_kegg_ora_dense(src$results_table, src$gene_col, src$padj_col, src$from_type, org_db, kegg_organism, alpha)
+
+        if (is.null(ora$result)) {
+            return(data.frame(ID = character(0), neg_log10_p = numeric(0)))
+        }
+
+        result_df <- as.data.frame(ora$result)
+
+        data.frame(ID = result_df$ID, neg_log10_p = -log10(result_df$pvalue), stringsAsFactors = FALSE)
+
+    })
+
+    names(per_source_pathway) <- source_names
+
+    pathway_score_matrix <- Reduce(
+        function(a, b) merge(a, b, by = "ID", all = TRUE),
+        lapply(source_names, function(nm) {
+            df <- per_source_pathway[[nm]]
+            names(df)[2] <- nm
+            df
+        })
+    )
+
+    rownames(pathway_score_matrix) <- pathway_score_matrix$ID
+    pathway_score_matrix$ID <- NULL
+    pathway_score_matrix <- pathway_score_matrix[, source_names, drop = FALSE]
+
+    pathway_correlation_matrix <- stats::cor(
+        as.matrix(pathway_score_matrix),
+        method = "pearson",
+        use = "pairwise.complete.obs"
+    )
+
+    save_csv(pathway_correlation_matrix, file.path(table_dir, "amp0961_null_baseline_pathway_correlation.csv"))
+
+    heatmap_height <- max(figure_height, length(source_names) * 0.3)
+    heatmap_width <- heatmap_height + 2
+    can_cluster <- !anyNA(pathway_correlation_matrix)
+
+    if (!can_cluster) {
+        message("Some compound pairs share no tested KEGG pathways in common (NA correlation); disabling heatmap clustering.")
+    }
+
+    for (ext in c("png", "pdf")) {
+
+        save_this_ext <- if (ext == "png") isTRUE(save_png) else isTRUE(save_pdf)
+
+        if (!save_this_ext) {
+            next
+        }
+
+        args <- list(
+            pathway_correlation_matrix,
+            cluster_rows = can_cluster, cluster_cols = can_cluster,
+            display_numbers = TRUE, number_format = "%.2f", fontsize_number = 6,
+            main = "AMP0961 Null Baseline: All-Compound KEGG Pathway Correlation (Top Dose)",
+            filename = file.path(figure_dir, paste0("Amp0961_null_baseline_pathway_correlation_heatmap.", ext)),
+            width = heatmap_width, height = heatmap_height
+        )
+
+        if (ext == "png") {
+            args$res <- figure_dpi
+        }
+
+        do.call(pheatmap::pheatmap, args)
+
+    }
+
+    #===========================================================================
+    # Selected-Gene log2FoldChange Correlation (Reuses
+    # build_and_save_gene_lfc_correlation() Unchanged)
+    #===========================================================================
+
+    per_source_genes <- lapply(sources, function(src) {
+        get_gene_lfc_by_entrez(src$results_table, src$gene_col, "log2FoldChange", src$padj_col, alpha, src$from_type, org_db)
+    })
+
+    names(per_source_genes) <- source_names
+
+    selected_union <- unique(unlist(lapply(per_source_genes, `[[`, "selected_entrez")))
+
+    gene_correlation_matrix <- build_and_save_gene_lfc_correlation(
+        per_source_genes, source_names, selected_union, org_db, table_dir, figure_dir,
+        "amp0961_null_baseline", "combined", "All AMP0961 Compounds, Top Dose",
+        figure_width, figure_height, figure_dpi, save_png, save_pdf
+    )
+
+    message("AMP0961 all-compound top-dose null baseline complete.")
+
+    list(
+        pathway_correlation_matrix = pathway_correlation_matrix,
+        gene_correlation_matrix = gene_correlation_matrix,
+        sources = sources
+    )
+
+}
+
+#===============================================================================
+# Concordance Proof: Matched Same-Drug Correlations vs. the AMP0961
+# Different-Drug Null Baseline
+#===============================================================================
+#
+# Pulls the already-saved matched same-drug cross-experiment correlation
+# (external-vs-AMP0961 and AMP0786-vs-AMP0961, both top dose, "combined"
+# i.e. not up/down split) for every compound run through compare_exp/ so
+# far (Rosi, MRL24, GW1929, T007), and reports each one's percentile rank
+# within run_amp0961_compound_null_baseline()'s different-drug
+# distribution -- the actual quantitative version of "repeated drugs
+# concordant across experiments, unlike different drugs within the
+# screen" the pasted methodology calls for.
+#===============================================================================
+
+run_compare_exp_concordance_proof <- function(
+    output_dir = "compare_exp",
+    null_baseline_dir = "compare_exp/concordance_proof",
+    figure_width = 9,
+    figure_height = 7,
+    figure_dpi = 600,
+    save_png = TRUE,
+    save_pdf = TRUE
+) {
+
+    message("Running concordance proof: matched same-drug vs. different-drug null baseline...")
+
+    if (!requireNamespace("ggplot2", quietly = TRUE)) {
+        stop("Package 'ggplot2' is required.")
+    }
+
+    table_dir <- file.path(null_baseline_dir, "Tables")
+    figure_dir <- file.path(null_baseline_dir, "Figures")
+
+    pathway_null <- as.matrix(utils::read.csv(
+        file.path(table_dir, "amp0961_null_baseline_pathway_correlation.csv"),
+        row.names = 1, check.names = FALSE
+    ))
+
+    gene_null <- as.matrix(utils::read.csv(
+        file.path(table_dir, "compare_exp_amp0961_null_baseline_selected_gene_lfc_correlation_combined.csv"),
+        row.names = 1, check.names = FALSE
+    ))
+
+    get_offdiag <- function(m) {
+        diag(m) <- NA
+        as.numeric(m[!is.na(m)])
+    }
+
+    pathway_null_values <- get_offdiag(pathway_null)
+    gene_null_values <- get_offdiag(gene_null)
+
+    percentile_rank <- function(x, distribution) mean(distribution <= x, na.rm = TRUE) * 100
+
+    compound_output_dir <- function(compound) {
+        if (tolower(compound) == "rosi") output_dir else file.path(output_dir, compound)
+    }
+
+    read_corr_value <- function(compound, filename, a, b) {
+
+        f <- file.path(compound_output_dir(compound), "Tables", filename)
+        m <- as.matrix(utils::read.csv(f, row.names = 1, check.names = FALSE))
+        m[a, b]
+
+    }
+
+    #===========================================================================
+    # Matched Same-Drug Pairs (Top Dose Each, From the compare_exp/ Runs
+    # Already Completed This Session)
+    #===========================================================================
+
+    matched_pairs <- list(
+        list(compound = "Rosi", partner_type = "External", amp0961_label = "AMP0961_Rosi_1000nM", partner_label = "external_Rosi_vs_DMSO_24h"),
+        list(compound = "Rosi", partner_type = "AMP0786", amp0961_label = "AMP0961_Rosi_1000nM", partner_label = "AMP0786_Rosi_1000nM"),
+        list(compound = "MRL24", partner_type = "External", amp0961_label = "AMP0961_MRL24_100nM", partner_label = "external_MRL24_vs_DMSO_24h"),
+        list(compound = "MRL24", partner_type = "AMP0786", amp0961_label = "AMP0961_MRL24_100nM", partner_label = "AMP0786_MRL24_1000nM"),
+        list(compound = "GW1929", partner_type = "External", amp0961_label = "AMP0961_GW1929_100nM", partner_label = "external_GW1929_vs_DMSO_24h"),
+        list(compound = "T007", partner_type = "AMP0786", amp0961_label = "AMP0961_T007_100nM", partner_label = "AMP0786_T007_10uM")
+    )
+
+    rows <- lapply(matched_pairs, function(p) {
+
+        pathway_file <- sprintf("compare_exp_%s_pathway_correlation.csv", tolower(p$compound))
+        gene_file <- sprintf("compare_exp_%s_selected_gene_lfc_correlation_combined.csv", tolower(p$compound))
+
+        pathway_r <- read_corr_value(p$compound, pathway_file, p$amp0961_label, p$partner_label)
+        gene_r <- read_corr_value(p$compound, gene_file, p$amp0961_label, p$partner_label)
+
+        data.frame(
+            compound = p$compound, partner_type = p$partner_type,
+            amp0961_label = p$amp0961_label, partner_label = p$partner_label,
+            pathway_r = pathway_r, pathway_percentile = percentile_rank(pathway_r, pathway_null_values),
+            gene_lfc_r = gene_r, gene_lfc_percentile = percentile_rank(gene_r, gene_null_values),
+            stringsAsFactors = FALSE
+        )
+
+    })
+
+    proof_table <- do.call(rbind, rows)
+
+    save_csv(proof_table, file.path(table_dir, "concordance_proof_pairs.csv"), row.names = FALSE)
+
+    message(sprintf(
+        "Matched same-drug pairs: pathway percentile range %.0f-%.0f, gene-LFC percentile range %.0f-%.0f (out of 100 vs. the different-drug null; higher = more concordant than chance).",
+        min(proof_table$pathway_percentile), max(proof_table$pathway_percentile),
+        min(proof_table$gene_lfc_percentile), max(proof_table$gene_lfc_percentile)
+    ))
+
+    #===========================================================================
+    # Strip Plot: Null Distribution (Grey) vs. Matched-Drug Points (Colored)
+    #===========================================================================
+
+    null_long <- rbind(
+        data.frame(metric = "KEGG pathway correlation (-log10 p, all tested pathways)", value = pathway_null_values, stringsAsFactors = FALSE),
+        data.frame(metric = "Selected-gene log2FoldChange correlation", value = gene_null_values, stringsAsFactors = FALSE)
+    )
+
+    proof_table$pair_label <- paste0(proof_table$compound, " (", proof_table$partner_type, ")")
+
+    matched_long <- rbind(
+        data.frame(metric = "KEGG pathway correlation (-log10 p, all tested pathways)", value = proof_table$pathway_r, pair_label = proof_table$pair_label, stringsAsFactors = FALSE),
+        data.frame(metric = "Selected-gene log2FoldChange correlation", value = proof_table$gene_lfc_r, pair_label = proof_table$pair_label, stringsAsFactors = FALSE)
+    )
+
+    set.seed(1)
+
+    strip_plot <- ggplot2::ggplot() +
+        ggplot2::geom_jitter(
+            data = null_long, ggplot2::aes(x = value, y = 0),
+            height = 0.12, width = 0, alpha = 0.4, color = "grey50", size = 1.6
+        ) +
+        ggplot2::geom_point(
+            data = matched_long, ggplot2::aes(x = value, y = 0.35, color = pair_label),
+            size = 3.2
+        )
+
+    if (requireNamespace("ggrepel", quietly = TRUE)) {
+        strip_plot <- strip_plot + ggrepel::geom_text_repel(
+            data = matched_long, ggplot2::aes(x = value, y = 0.35, label = pair_label, color = pair_label),
+            size = 3, show.legend = FALSE, direction = "both", min.segment.length = 0, seed = 1
+        )
+    } else {
+        strip_plot <- strip_plot + ggplot2::geom_text(
+            data = matched_long, ggplot2::aes(x = value, y = 0.5, label = pair_label, color = pair_label),
+            size = 3, show.legend = FALSE
+        )
+    }
+
+    strip_plot <- strip_plot +
+        ggplot2::facet_wrap(~metric, ncol = 1, scales = "free_x") +
+        ggplot2::scale_y_continuous(limits = c(-0.3, 0.8), breaks = NULL) +
+        ggplot2::labs(
+            title = "Concordance Proof: Same Drug Across Experiments vs. Different Drugs Within AMP0961",
+            subtitle = paste0(
+                "Grey = different-drug null baseline (all ~20 AMP0961 compounds, top dose, every pair)\n",
+                "Colored = matched same-drug pairs (external paper or AMP0786 vs. AMP0961, top dose)"
+            ),
+            x = "Pearson correlation", y = NULL, color = "Matched pair"
+        ) +
+        ggplot2::theme_bw() +
+        ggplot2::theme(legend.position = "none", strip.text = ggplot2::element_text(size = 9))
+
+    if (isTRUE(save_png)) {
+        ggplot2::ggsave(
+            file.path(figure_dir, "Concordance_proof_scatter.png"),
+            plot = strip_plot, width = figure_width, height = figure_height, dpi = figure_dpi
+        )
+    }
+
+    if (isTRUE(save_pdf)) {
+        ggplot2::ggsave(
+            file.path(figure_dir, "Concordance_proof_scatter.pdf"),
+            plot = strip_plot, width = figure_width, height = figure_height
+        )
+    }
+
+    message("Concordance proof complete.")
+
+    proof_table
 
 }
