@@ -7,7 +7,7 @@
 #   Compares this study's DESeq2 results against the published dataset from
 #   Rayl et al. 2024 (Molecular Pharmacology), stored in data/external/.
 #   Assumes DGE_pipeline.R has already been run (this study's DESeq2 tables
-#   must exist in Output/DESeq2/Tables).
+#   must exist in results/AMP0786/DESeq2/Tables).
 ################################################################################
 
 source("config.R")

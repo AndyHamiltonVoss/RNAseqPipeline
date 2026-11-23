@@ -45,7 +45,7 @@ build_combined_experiment_dataset <- function() {
 
     message("Building combined AMP0786/AMP0961 raw dataset...")
 
-    output_dir <- "Output_both"
+    output_dir <- "results/compare_both"
     dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 
     shared_drug_groups <- c("MRL24_100nM", "Rosi_1000nM")
@@ -54,7 +54,7 @@ build_combined_experiment_dataset <- function() {
     # AMP0786: All 18 Samples (One Library, So Controls Need No Filtering)
     #===========================================================================
 
-    amp0786_metadata <- read.csv("Output/Metadata/sample_metadata.csv", stringsAsFactors = FALSE)
+    amp0786_metadata <- read.csv("results/AMP0786/Metadata/sample_metadata.csv", stringsAsFactors = FALSE)
     amp0786_metadata <- amp0786_metadata[amp0786_metadata$group %in% c("DMSO", shared_drug_groups), ]
 
     amp0786_metadata$library <- "SP_L270526AV1_01"
@@ -74,7 +74,7 @@ build_combined_experiment_dataset <- function() {
     # AMP0961: Drug Samples + Only Library-Matched Controls
     #===========================================================================
 
-    amp0961_metadata <- read.csv("Output_AMP0961/Metadata/sample_metadata.csv", stringsAsFactors = FALSE)
+    amp0961_metadata <- read.csv("results/AMP0961/Metadata/sample_metadata.csv", stringsAsFactors = FALSE)
 
     drug_libraries <- unique(amp0961_metadata$library[amp0961_metadata$group %in% shared_drug_groups])
 
@@ -177,7 +177,7 @@ build_combined_experiment_dataset <- function() {
         sep = "\t", row.names = FALSE, quote = FALSE
     )
 
-    message("Combined dataset written to Output_both/.")
+    message("Combined dataset written to results/compare_both/.")
 
     return(
         list(

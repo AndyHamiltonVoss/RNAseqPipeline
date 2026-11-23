@@ -8,7 +8,7 @@
 #   the two drugs shared between them (MRL24_100nM, Rosi_1000nM), using
 #   the library-adjusted, shared-Control-baseline DESeq2 contrasts already
 #   written by run_deseq2() on the combined dataset (config_both.R,
-#   Output_both/DESeq2/Tables/DESeq2_group_<drug>_<experiment>_vs_Control_
+#   results/compare_both/DESeq2/Tables/DESeq2_group_<drug>_<experiment>_vs_Control_
 #   shrunk.csv). Mirrors R/compound_similarity.R's gene-level view:
 #     - Pearson correlation of log2FoldChange (all tested genes).
 #     - Direction-aware Jaccard overlap of significant (padj < alpha,
@@ -36,9 +36,9 @@ run_experiment_comparison <- function(alpha = 0.05, log2fc_cutoff = 1) {
         stop("Package 'pheatmap' is required.")
     }
 
-    table_dir <- "Output_both/DESeq2/Tables"
-    out_table_dir <- "Output_both/Comparison/Tables"
-    out_figure_dir <- "Output_both/Comparison/Figures"
+    table_dir <- "results/compare_both/DESeq2/Tables"
+    out_table_dir <- "results/compare_both/Comparison/Tables"
+    out_figure_dir <- "results/compare_both/Comparison/Figures"
 
     dir.create(out_table_dir, recursive = TRUE, showWarnings = FALSE)
     dir.create(out_figure_dir, recursive = TRUE, showWarnings = FALSE)

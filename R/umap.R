@@ -161,7 +161,7 @@ run_umap <- function(counts, metadata, config) {
 # limma::removeBatchEffect() applied to the VST matrix first -- batch =
 # metadata$library, design = model.matrix(~ group) so the group effect is
 # protected rather than regressed out along with the batch effect. Lets a
-# multi-experiment/multi-library dataset (e.g. Output_both) be visually
+# multi-experiment/multi-library dataset (e.g. results/compare_both) be visually
 # checked for whether the batch structure seen in the uncorrected UMAP
 # (run_umap()) is a library/experiment artifact that correction resolves,
 # or whether it persists. Requires a metadata "library" column with more

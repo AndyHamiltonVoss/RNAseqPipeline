@@ -51,7 +51,7 @@ config <- list(
     # Output
     #---------------------------------------------------------------------------
 
-    output_directory = "Output",
+    output_directory = "results/AMP0786",
 
     overwrite_output = FALSE,
 

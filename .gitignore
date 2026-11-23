@@ -49,6 +49,4 @@ po/*~
 rsconnect/
 
 # Pipeline run outputs
-/Output/
-/Output_*/
-/compare_exp/
+/results/

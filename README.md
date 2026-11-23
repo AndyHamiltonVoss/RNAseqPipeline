@@ -24,4 +24,4 @@ It reprocesses the paper's normalized count table through this pipeline's own DE
 module to confirm the results are reproducible, then compares this study's dose-response
 gene sets against the paper's reported significant genes. Requires `DGE_pipeline.R` to
 have been run first. Small summary tables are written to `analysis/external_validation/`;
-figures are written to `Output/Figures/` (not version-controlled).
+figures are written to `results/AMP0786/Figures/` (not version-controlled).

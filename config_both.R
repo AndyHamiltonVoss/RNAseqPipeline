@@ -6,7 +6,7 @@
 # Description:
 #   Combined AMP0786/AMP0961 reproducibility check: DESeq2 on the merged
 #   raw dataset built by R/prepare_combined_experiment_data.R
-#   (Output_both/combined_raw_counts.txt, Output_both/combined_metadata.csv)
+#   (results/compare_both/combined_raw_counts.txt, results/compare_both/combined_metadata.csv)
 #   -- the two drugs shared between both experiments (MRL24, Rosi) at
 #   their one exactly-matching dose each (MRL24_100nM, Rosi_1000nM), plus
 #   library-matched controls only. design_formula = "~ library + group"
@@ -67,9 +67,9 @@ config <- list(
     # Input Files
     #---------------------------------------------------------------------------
 
-    counts_file = "Output_both/combined_raw_counts.txt",
+    counts_file = "results/compare_both/combined_raw_counts.txt",
 
-    metadata_file = "Output_both/combined_metadata.csv",
+    metadata_file = "results/compare_both/combined_metadata.csv",
 
     annotation_file = NULL,
 
@@ -78,7 +78,7 @@ config <- list(
     # Output
     #---------------------------------------------------------------------------
 
-    output_directory = "Output_both",
+    output_directory = "results/compare_both",
 
     overwrite_output = FALSE,
 

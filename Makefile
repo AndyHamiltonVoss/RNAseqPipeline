@@ -13,4 +13,4 @@ style:
 	Rscript -e "styler::style_dir('.')"
 
 clean:
-	rm -rf Output/*
+	rm -rf results/AMP0786/*

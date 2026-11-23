@@ -14,7 +14,7 @@
 #
 #   Reruns the compound-similarity (Jaccard + LFC correlation) and
 #   ligand-group Venn analyses on these curated sets, writing to a
-#   dedicated Output_AMP0961/T007_Curated/ folder so they're easy to find
+#   dedicated results/AMP0961/T007_Curated/ folder so they're easy to find
 #   and distinguish from the uncurated versions.
 #
 ################################################################################

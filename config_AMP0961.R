@@ -69,7 +69,7 @@ config <- list(
     # Output
     #---------------------------------------------------------------------------
 
-    output_directory = "Output_AMP0961",
+    output_directory = "results/AMP0961",
 
     overwrite_output = FALSE,
 
@@ -318,7 +318,7 @@ config <- list(
     # Starting points, not a final answer -- edit/replace freely. Each entry
     # is 2-5 compound codes for a Venn diagram (R/ligand_group_venn.R),
     # seeded from this session's Jaccard/LFC-correlation clustering
-    # (Output_AMP0961/DESeq2/Tables/compound_jaccard_similarity.csv,
+    # (results/AMP0961/DESeq2/Tables/compound_jaccard_similarity.csv,
     # compound_lfc_correlation.csv).
     venn_compound_groups = list(
         full_agonists = c("GW1929", "Dar", "Rosi", "Eda"),

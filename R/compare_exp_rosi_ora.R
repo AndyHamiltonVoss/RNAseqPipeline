@@ -222,8 +222,8 @@ get_compare_exp_sources <- function(
     amp0786_doses = c("1nM", "10nM", "100nM", "1000nM"),
     amp0961_doses = c("0.125nM", "2.5nM", "50nM", "1000nM"),
     external_path = "/mnt/d/DRUGseq/ref/1-s2.0-S0026895X24018340-mmc4-992_supp_datafile2_24h.xlsx",
-    amp0786_dir = "Output/DESeq2/Tables",
-    amp0961_dir = "Output_AMP0961/DESeq2/Tables",
+    amp0786_dir = "results/AMP0786/DESeq2/Tables",
+    amp0961_dir = "results/AMP0961/DESeq2/Tables",
     include_external = TRUE
 ) {
 
@@ -286,10 +286,10 @@ run_compare_exp_rosi_ora <- function(
     amp0786_doses = c("1nM", "10nM", "100nM", "1000nM"),
     amp0961_doses = c("0.125nM", "2.5nM", "50nM", "1000nM"),
     external_path = "/mnt/d/DRUGseq/ref/1-s2.0-S0026895X24018340-mmc4-992_supp_datafile2_24h.xlsx",
-    amp0786_dir = "Output/DESeq2/Tables",
-    amp0961_dir = "Output_AMP0961/DESeq2/Tables",
+    amp0786_dir = "results/AMP0786/DESeq2/Tables",
+    amp0961_dir = "results/AMP0961/DESeq2/Tables",
     include_external = TRUE,
-    output_dir = "compare_exp",
+    output_dir = file.path("results/compare_exp", compound),
     alpha = 0.05,
     figure_width = 8,
     figure_height = 6,
@@ -381,10 +381,10 @@ run_compare_exp_pathway_correlation <- function(
     amp0786_doses = c("1nM", "10nM", "100nM", "1000nM"),
     amp0961_doses = c("0.125nM", "2.5nM", "50nM", "1000nM"),
     external_path = "/mnt/d/DRUGseq/ref/1-s2.0-S0026895X24018340-mmc4-992_supp_datafile2_24h.xlsx",
-    amp0786_dir = "Output/DESeq2/Tables",
-    amp0961_dir = "Output_AMP0961/DESeq2/Tables",
+    amp0786_dir = "results/AMP0786/DESeq2/Tables",
+    amp0961_dir = "results/AMP0961/DESeq2/Tables",
     include_external = TRUE,
-    output_dir = "compare_exp",
+    output_dir = file.path("results/compare_exp", compound),
     alpha = 0.05,
     figure_width = 8,
     figure_height = 6,
@@ -634,10 +634,10 @@ run_compare_exp_gene_correlation <- function(
     amp0786_doses = c("1nM", "10nM", "100nM", "1000nM"),
     amp0961_doses = c("0.125nM", "2.5nM", "50nM", "1000nM"),
     external_path = "/mnt/d/DRUGseq/ref/1-s2.0-S0026895X24018340-mmc4-992_supp_datafile2_24h.xlsx",
-    amp0786_dir = "Output/DESeq2/Tables",
-    amp0961_dir = "Output_AMP0961/DESeq2/Tables",
+    amp0786_dir = "results/AMP0786/DESeq2/Tables",
+    amp0961_dir = "results/AMP0961/DESeq2/Tables",
     include_external = TRUE,
-    output_dir = "compare_exp",
+    output_dir = file.path("results/compare_exp", compound),
     alpha = 0.05,
     figure_width = 8,
     figure_height = 6,
@@ -739,7 +739,7 @@ run_compare_exp_gene_correlation <- function(
 
 run_compare_exp_updown_scatter <- function(
     compound = "Rosi",
-    output_dir = "compare_exp",
+    output_dir = file.path("results/compare_exp", compound),
     figure_width = 9,
     figure_height = 7,
     figure_dpi = 600,
@@ -869,10 +869,10 @@ run_compare_exp_updown_gene_counts <- function(
     amp0786_doses = c("1nM", "10nM", "100nM", "1000nM"),
     amp0961_doses = c("0.125nM", "2.5nM", "50nM", "1000nM"),
     external_path = "/mnt/d/DRUGseq/ref/1-s2.0-S0026895X24018340-mmc4-992_supp_datafile2_24h.xlsx",
-    amp0786_dir = "Output/DESeq2/Tables",
-    amp0961_dir = "Output_AMP0961/DESeq2/Tables",
+    amp0786_dir = "results/AMP0786/DESeq2/Tables",
+    amp0961_dir = "results/AMP0961/DESeq2/Tables",
     include_external = TRUE,
-    output_dir = "compare_exp",
+    output_dir = file.path("results/compare_exp", compound),
     alpha = 0.05,
     figure_width = 9,
     figure_height = 6,
@@ -990,7 +990,7 @@ run_compare_exp_updown_gene_counts <- function(
 #===============================================================================
 
 get_amp0961_all_compound_top_dose_sources <- function(
-    amp0961_dir = "Output_AMP0961/DESeq2/Tables",
+    amp0961_dir = "results/AMP0961/DESeq2/Tables",
     reference_group = "Control"
 ) {
 
@@ -1049,9 +1049,9 @@ get_amp0961_all_compound_top_dose_sources <- function(
 #===============================================================================
 
 run_amp0961_compound_null_baseline <- function(
-    amp0961_dir = "Output_AMP0961/DESeq2/Tables",
+    amp0961_dir = "results/AMP0961/DESeq2/Tables",
     reference_group = "Control",
-    output_dir = "compare_exp/concordance_proof",
+    output_dir = "results/compare_exp/concordance_proof",
     alpha = 0.05,
     figure_width = 10,
     figure_height = 9,
@@ -1204,8 +1204,8 @@ run_amp0961_compound_null_baseline <- function(
 #===============================================================================
 
 run_compare_exp_concordance_proof <- function(
-    output_dir = "compare_exp",
-    null_baseline_dir = "compare_exp/concordance_proof",
+    output_dir = "results/compare_exp",
+    null_baseline_dir = "results/compare_exp/concordance_proof",
     figure_width = 9,
     figure_height = 7,
     figure_dpi = 600,
@@ -1243,7 +1243,7 @@ run_compare_exp_concordance_proof <- function(
     percentile_rank <- function(x, distribution) mean(distribution <= x, na.rm = TRUE) * 100
 
     compound_output_dir <- function(compound) {
-        if (tolower(compound) == "rosi") output_dir else file.path(output_dir, compound)
+        file.path(output_dir, compound)
     }
 
     read_corr_value <- function(compound, filename, a, b) {
