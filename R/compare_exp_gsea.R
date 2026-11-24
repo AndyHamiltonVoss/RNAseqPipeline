@@ -123,7 +123,7 @@ make_gsea_config_stub <- function(alpha, figure_width = 8, figure_height = 6, fi
 # ENTREZID, then re-sort), not a modification of the original.
 #===============================================================================
 
-build_ranked_entrez_vector_generic <- function(ranked_gene_vector, org_pkg, from_type, pvalue_by_gene = NULL) {
+build_ranked_entrez_vector_generic <- function(ranked_gene_vector, org_pkg, from_type, padj_by_gene = NULL) {
 
     org_db <- get(org_pkg, envir = asNamespace(org_pkg))
 
@@ -135,8 +135,8 @@ build_ranked_entrez_vector_generic <- function(ranked_gene_vector, org_pkg, from
 
     if (nrow(id_map) == 0) {
         ranked <- numeric(0)
-        if (is.null(pvalue_by_gene)) return(ranked)
-        return(list(ranked = ranked, pvalue = numeric(0)))
+        if (is.null(padj_by_gene)) return(ranked)
+        return(list(ranked = ranked, padj = numeric(0)))
     }
 
     id_map$stat <- ranked_gene_vector[id_map[[from_type]]]
@@ -151,19 +151,19 @@ build_ranked_entrez_vector_generic <- function(ranked_gene_vector, org_pkg, from
 
     ranked <- sort(ranked, decreasing = TRUE)
 
-    if (is.null(pvalue_by_gene)) {
+    if (is.null(padj_by_gene)) {
         return(ranked)
     }
 
     # Same deduplicated (one row per ENTREZID) id_map used to build
-    # `ranked` above, so this pvalue is the one belonging to the exact
+    # `ranked` above, so this padj is the one belonging to the exact
     # original gene ID that was kept for each ENTREZID, not an arbitrary
     # one from the one-to-many collapse.
-    pvalue <- pvalue_by_gene[id_map[[from_type]]]
-    names(pvalue) <- id_map$ENTREZID
-    pvalue <- pvalue[names(ranked)]
+    padj <- padj_by_gene[id_map[[from_type]]]
+    names(padj) <- id_map$ENTREZID
+    padj <- padj[names(ranked)]
 
-    list(ranked = ranked, pvalue = pvalue)
+    list(ranked = ranked, padj = padj)
 
 }
 
@@ -178,24 +178,24 @@ build_ranked_entrez_vector_generic <- function(ranked_gene_vector, org_pkg, from
 # split_gsea_result_by_significance() rather than two separate calls.
 #===============================================================================
 
-run_gsea_kegg_for_source <- function(results_table, gene_col, lfc_col, from_type, org_pkg, kegg_organism, gsea_config, pvalue_col = "pvalue") {
+run_gsea_kegg_for_source <- function(results_table, gene_col, lfc_col, from_type, org_pkg, kegg_organism, gsea_config, padj_col = "padj") {
 
     ranked_gene_vector <- build_ranked_gene_vector(results_table, gene_col = gene_col, stat_col = lfc_col)
 
-    pvalue_by_gene <- NULL
-    if (pvalue_col %in% names(results_table)) {
-        pvalue_by_gene <- suppressWarnings(as.numeric(results_table[[pvalue_col]]))
-        names(pvalue_by_gene) <- results_table[[gene_col]]
+    padj_by_gene <- NULL
+    if (padj_col %in% names(results_table)) {
+        padj_by_gene <- suppressWarnings(as.numeric(results_table[[padj_col]]))
+        names(padj_by_gene) <- results_table[[gene_col]]
     }
 
-    entrez_result <- build_ranked_entrez_vector_generic(ranked_gene_vector, org_pkg, from_type, pvalue_by_gene)
+    entrez_result <- build_ranked_entrez_vector_generic(ranked_gene_vector, org_pkg, from_type, padj_by_gene)
 
     if (is.list(entrez_result)) {
         ranked_entrez_vector <- entrez_result$ranked
-        ranked_entrez_pvalue <- entrez_result$pvalue
+        ranked_entrez_padj <- entrez_result$padj
     } else {
         ranked_entrez_vector <- entrez_result
-        ranked_entrez_pvalue <- NULL
+        ranked_entrez_padj <- NULL
     }
 
     dense_result <- run_gsea_kegg(ranked_entrez_vector, kegg_organism, gsea_config)
@@ -208,7 +208,7 @@ run_gsea_kegg_for_source <- function(results_table, gene_col, lfc_col, from_type
         n_ranked = length(ranked_gene_vector),
         n_mapped_to_entrez = length(ranked_entrez_vector),
         ranked_entrez_vector = ranked_entrez_vector,
-        ranked_entrez_pvalue = ranked_entrez_pvalue
+        ranked_entrez_padj = ranked_entrez_padj
     )
 
 }
@@ -344,14 +344,15 @@ run_compare_exp_gsea <- function(
         # fed to gseKEGG() for this source -- same ranking
         # build_ranked_gene_vector()/build_ranked_entrez_vector_generic()
         # produced inside run_gsea_kegg_for_source(), already sorted
-        # descending. pvalue is the original (pre-shrinkage) DESeq2/ashr
-        # gene-level p-value for that same gene, for reference only -- it
-        # plays no role in the ranking itself, which is by shrunken LFC.
+        # descending. padj is the original (pre-shrinkage) DESeq2/ashr
+        # gene-level adjusted p-value for that same gene, for reference
+        # only -- it plays no role in the ranking itself, which is by
+        # shrunken LFC.
         ranked_list <- data.frame(
             rank = seq_along(gsea_result$ranked_entrez_vector),
             ENTREZID = names(gsea_result$ranked_entrez_vector),
             shrunken_log2FoldChange = as.numeric(gsea_result$ranked_entrez_vector),
-            pvalue = as.numeric(gsea_result$ranked_entrez_pvalue[names(gsea_result$ranked_entrez_vector)]),
+            padj = as.numeric(gsea_result$ranked_entrez_padj[names(gsea_result$ranked_entrez_vector)]),
             stringsAsFactors = FALSE
         )
 
