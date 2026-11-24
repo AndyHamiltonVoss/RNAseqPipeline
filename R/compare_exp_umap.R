@@ -92,7 +92,8 @@ get_combined_umap_sample_metadata <- function(
     amp0786_file = "results/AMP0786/DESeq2/Tables/DESeq2_normalized_counts.csv",
     amp0961_file = "results/AMP0961/DESeq2/Tables/DESeq2_normalized_counts.csv",
     external_path = "/mnt/d/DRUGseq/ref/1-s2.0-S0026895X24018340-mmc4-992_supp_datafile2_24h.xlsx",
-    compounds = c("Rosi", "MRL24", "GW1929", "T007")
+    compounds = c("Rosi", "MRL24", "GW1929", "T007"),
+    top_dose_only = FALSE
 ) {
 
     if (!requireNamespace("readxl", quietly = TRUE)) {
@@ -131,10 +132,36 @@ get_combined_umap_sample_metadata <- function(
     combined <- rbind(amp0786_meta, amp0961_meta, external_meta)
     combined$sample <- paste0(combined$source, "__", combined$original_sample)
 
+    # The external source has only one (unlabeled) dose per compound to
+    # begin with, so parse_dose_group() returns NULL for it and it's
+    # left untouched here regardless of top_dose_only -- only AMP0786/
+    # AMP0961 (dose encoded in `group`, e.g. "Rosi_1000nM") get filtered.
+    if (isTRUE(top_dose_only)) {
+
+        non_control <- combined$compound != "Control"
+
+        parsed <- lapply(combined$group[non_control], parse_dose_group)
+
+        combined$dose_nM <- NA_real_
+        combined$dose_nM[non_control] <- vapply(parsed, function(p) if (is.null(p)) NA_real_ else p$dose_nM, numeric(1))
+
+        max_dose <- stats::ave(
+            combined$dose_nM, combined$source, combined$compound,
+            FUN = function(x) if (all(is.na(x))) NA_real_ else max(x, na.rm = TRUE)
+        )
+
+        is_top_or_exempt <- combined$compound == "Control" | is.na(combined$dose_nM) | combined$dose_nM == max_dose
+
+        combined <- combined[is_top_or_exempt, ]
+        combined$dose_nM <- NULL
+
+    }
+
     message(sprintf(
-        "Combined UMAP metadata: %d samples (%d AMP0786, %d AMP0961, %d external).",
+        "Combined UMAP metadata: %d samples (%d AMP0786, %d AMP0961, %d external)%s.",
         nrow(combined),
-        sum(combined$source == "AMP0786"), sum(combined$source == "AMP0961"), sum(combined$source == "external")
+        sum(combined$source == "AMP0786"), sum(combined$source == "AMP0961"), sum(combined$source == "external"),
+        if (isTRUE(top_dose_only)) ", top dose only" else ""
     ))
 
     combined
@@ -307,7 +334,9 @@ run_compare_exp_sample_umap <- function(
     amp0961_file = "results/AMP0961/DESeq2/Tables/DESeq2_normalized_counts.csv",
     external_path = "/mnt/d/DRUGseq/ref/1-s2.0-S0026895X24018340-mmc4-992_supp_datafile2_24h.xlsx",
     compounds = c("Rosi", "MRL24", "GW1929", "T007"),
-    top_n_genes = 500,
+    include_control = TRUE,
+    top_dose_only = FALSE,
+    top_n_genes = NULL,
     output_dir = "results/compare_exp/UMAP",
     n_neighbors = 15,
     min_dist = 0.1,
@@ -319,7 +348,7 @@ run_compare_exp_sample_umap <- function(
     save_pdf = TRUE
 ) {
 
-    message("Running cross-experiment sample-level gene UMAP...")
+    message(sprintf("Running cross-experiment sample-level gene UMAP%s...", if (isTRUE(top_dose_only)) " (top dose only)" else ""))
 
     if (!requireNamespace("uwot", quietly = TRUE)) {
         stop("Package 'uwot' is required.")
@@ -329,23 +358,60 @@ run_compare_exp_sample_umap <- function(
         stop("Package 'ggplot2' is required.")
     }
 
-    combined_metadata <- get_combined_umap_sample_metadata(amp0786_file, amp0961_file, external_path, compounds)
+    combined_metadata <- get_combined_umap_sample_metadata(amp0786_file, amp0961_file, external_path, compounds, top_dose_only)
+
+    if (!isTRUE(include_control)) {
+        combined_metadata <- combined_metadata[combined_metadata$compound != "Control", ]
+    }
 
     expr <- get_combined_umap_expression_matrix(combined_metadata, amp0786_file, amp0961_file, external_path)
 
     z_mat <- expr$z_matrix[stats::complete.cases(expr$z_matrix), , drop = FALSE]
 
-    gene_vars <- apply(z_mat, 1, stats::var)
-    n_top <- min(top_n_genes, length(gene_vars))
-    top_genes <- names(sort(gene_vars, decreasing = TRUE))[seq_len(n_top)]
+    # top_n_genes = NULL (default) -> use every shared, complete-case
+    # gene, matching the pathway UMAP/the correlation heatmaps (neither
+    # of those restrict to a "top variable" subset either). Pass a
+    # number to subset to the most variable genes instead, same as
+    # before.
+    if (is.null(top_n_genes)) {
 
-    message(sprintf("Embedding %d samples on top %d variable genes (within-source z-scored).", ncol(z_mat), n_top))
+        embedding_genes <- rownames(z_mat)
+        message(sprintf("Embedding %d samples on all %d shared genes (within-source z-scored).", ncol(z_mat), length(embedding_genes)))
+
+    } else {
+
+        gene_vars <- apply(z_mat, 1, stats::var)
+        n_top <- min(top_n_genes, length(gene_vars))
+        embedding_genes <- names(sort(gene_vars, decreasing = TRUE))[seq_len(n_top)]
+        message(sprintf("Embedding %d samples on top %d variable genes (within-source z-scored).", ncol(z_mat), n_top))
+
+    }
+
+    default_compounds <- c("Rosi", "MRL24", "GW1929", "T007")
+    compound_tag <- if (setequal(compounds, default_compounds)) "" else paste0("_", paste(tolower(sort(compounds)), collapse = "_"))
+    control_tag <- if (!isTRUE(include_control)) "_no_control" else ""
+
+    title_suffix <- paste0(
+        if (isTRUE(top_dose_only)) " (Top Dose Only)" else "",
+        if (nzchar(compound_tag)) sprintf(" [%s]", paste(compounds, collapse = ", ")) else "",
+        if (!isTRUE(include_control)) " (No Control)" else ""
+    )
+    gene_set_label <- if (is.null(top_n_genes)) "All Genes" else "Top Variable Genes"
+    file_tag <- paste0(
+        "gene", if (is.null(top_n_genes)) "_all" else "", if (isTRUE(top_dose_only)) "_top_dose" else "",
+        compound_tag, control_tag
+    )
+
+    # The compound-scope suffix can make the title long enough to clip
+    # against a fixed-width canvas -- widen a little whenever it's
+    # present instead of letting it run off the edge.
+    plot_width <- if (nzchar(compound_tag) || nzchar(control_tag)) figure_width + 2 else figure_width
 
     result <- run_umap_with_shape(
-        z_mat[top_genes, , drop = FALSE], combined_metadata,
-        "Cross-Experiment Sample UMAP: Gene Expression (Top Variable Genes)",
-        "gene", output_dir, n_neighbors, min_dist, random_seed,
-        figure_width, figure_height, figure_dpi, save_png, save_pdf
+        z_mat[embedding_genes, , drop = FALSE], combined_metadata,
+        sprintf("Cross-Experiment Sample UMAP: Gene Expression (%s)%s", gene_set_label, title_suffix),
+        file_tag, output_dir, n_neighbors, min_dist, random_seed,
+        plot_width, figure_height, figure_dpi, save_png, save_pdf
     )
 
     message("Cross-experiment sample-level gene UMAP complete.")
