@@ -176,7 +176,8 @@ run_gsea_kegg_for_source <- function(results_table, gene_col, lfc_col, from_type
         significant = split_result$significant,
         dense = split_result$dense,
         n_ranked = length(ranked_gene_vector),
-        n_mapped_to_entrez = length(ranked_entrez_vector)
+        n_mapped_to_entrez = length(ranked_entrez_vector),
+        ranked_entrez_vector = ranked_entrez_vector
     )
 
 }
@@ -301,6 +302,30 @@ run_compare_exp_gsea <- function(
         filename_base <- paste0("GSEA_KEGG_", src$source_label, "_", src$label)
 
         save_gsea_result(gsea_result$significant, filename_base, table_dir, figure_dir, gsea_config)
+
+        # Every tested pathway (not just the significant ones) -- no
+        # dotplot, a ~300-pathway dotplot isn't readable, and
+        # save_gsea_result()'s dotplot is only ever built from the
+        # significant-only result above anyway.
+        save_gsea_result(gsea_result$dense, paste0(filename_base, "_dense"), table_dir, figure_dir, gsea_config, make_dotplot = FALSE)
+
+        # The ranked (shrunken log2FoldChange, ENTREZID) vector actually
+        # fed to gseKEGG() for this source -- same ranking
+        # build_ranked_gene_vector()/build_ranked_entrez_vector_generic()
+        # produced inside run_gsea_kegg_for_source(), already sorted
+        # descending.
+        ranked_list <- data.frame(
+            rank = seq_along(gsea_result$ranked_entrez_vector),
+            ENTREZID = names(gsea_result$ranked_entrez_vector),
+            shrunken_log2FoldChange = as.numeric(gsea_result$ranked_entrez_vector),
+            stringsAsFactors = FALSE
+        )
+
+        save_csv(
+            ranked_list,
+            file.path(table_dir, paste0(filename_base, "_ranked_gene_list.csv")),
+            row.names = FALSE
+        )
 
         n_sig_terms <- if (is.null(gsea_result$significant)) 0 else nrow(as.data.frame(gsea_result$significant))
 
@@ -772,16 +797,107 @@ run_compare_exp_gsea_updown_gene_counts <- function(
 }
 
 #===============================================================================
-# KEGG Dot Plot: Pathway (y) x Dose/Experiment (x), Size = Leading-Edge
-# Gene Count, Color = Adjusted p-Value
+# Build, Select, Plot, and Save One Direction's (Up or Down) KEGG Dot
+# Plot -- Shared by run_compare_exp_gsea_kegg_dotplot()
+#===============================================================================
+
+build_and_save_gsea_direction_dotplot <- function(
+    dot_table, x_levels, compound, alpha, direction_label, file_tag,
+    table_dir, figure_dir, max_pathways, figure_width, figure_height, figure_dpi, save_png, save_pdf
+) {
+
+    if (nrow(dot_table) == 0) {
+        warning("No ", tolower(direction_label), " pathways found for ", compound, "; skipping that plot.")
+        return(NULL)
+    }
+
+    n_sources_by_pathway <- tapply(dot_table$x_label, dot_table$Description, function(x) length(unique(x)))
+    best_p_by_pathway <- tapply(dot_table$p.adjust, dot_table$Description, min)
+
+    pathway_summary <- data.frame(
+        Description = names(n_sources_by_pathway),
+        n_sources = as.integer(n_sources_by_pathway),
+        best_p = best_p_by_pathway[names(n_sources_by_pathway)],
+        stringsAsFactors = FALSE
+    )
+
+    pathway_summary <- pathway_summary[order(-pathway_summary$n_sources, pathway_summary$best_p), ]
+
+    selected_pathways <- utils::head(pathway_summary$Description, max_pathways)
+
+    dot_table <- dot_table[dot_table$Description %in% selected_pathways, ]
+
+    dot_table$x_label <- factor(dot_table$x_label, levels = x_levels)
+    dot_table$Description <- factor(dot_table$Description, levels = rev(selected_pathways))
+
+    n_pathways_shown <- length(selected_pathways)
+
+    dot_plot <- ggplot2::ggplot(dot_table, ggplot2::aes(x = x_label, y = Description, size = Count, color = p.adjust)) +
+        ggplot2::geom_point() +
+        ggplot2::scale_color_gradient(low = "red", high = "blue") +
+        ggplot2::scale_size_continuous(range = c(2, 9)) +
+        ggplot2::scale_x_discrete(drop = FALSE) +
+        ggplot2::labs(
+            title = sprintf("%s GSEA KEGG Pathway Enrichment Across Doses and Experiments\n%s", compound, direction_label),
+            subtitle = paste0(
+                sprintf("Significant, %s pathways (padj < %s, NES %s 0) in at least one source\n", tolower(direction_label), alpha, if (file_tag == "up") ">" else "<"),
+                sprintf("Top %d shown, ranked by breadth then significance; size = leading-edge gene count", n_pathways_shown)
+            ),
+            x = NULL, y = NULL, size = "Leading-edge\ngene count", color = "Adjusted\np-value"
+        ) +
+        ggplot2::theme_bw() +
+        ggplot2::theme(
+            axis.text.x = ggplot2::element_text(size = 8),
+            axis.text.y = ggplot2::element_text(size = 7),
+            panel.grid.major = ggplot2::element_line(color = "grey92")
+        )
+
+    save_csv(
+        dot_table[, c("x_label", "Description", "Count", "p.adjust", "NES")],
+        file.path(table_dir, sprintf("compare_exp_%s_gsea_kegg_dotplot_%s.csv", tolower(compound), file_tag)),
+        row.names = FALSE
+    )
+
+    plot_height <- max(figure_height, 2 + n_pathways_shown * 0.22)
+
+    if (isTRUE(save_png)) {
+        ggplot2::ggsave(
+            file.path(figure_dir, sprintf("Compare_exp_%s_gsea_kegg_dotplot_%s.png", tolower(compound), file_tag)),
+            plot = dot_plot, width = figure_width, height = plot_height, dpi = figure_dpi, limitsize = FALSE
+        )
+    }
+
+    if (isTRUE(save_pdf)) {
+        ggplot2::ggsave(
+            file.path(figure_dir, sprintf("Compare_exp_%s_gsea_kegg_dotplot_%s.pdf", tolower(compound), file_tag)),
+            plot = dot_plot, width = figure_width, height = plot_height, limitsize = FALSE
+        )
+    }
+
+    list(dot_table = dot_table, plot = dot_plot)
+
+}
+
+#===============================================================================
+# KEGG Dot Plots: Pathway (y) x Dose/Experiment (x), Size = Leading-Edge
+# Gene Count, Color = Adjusted p-Value -- Split Into Up- and
+# Down-Regulated Pathways
 #===============================================================================
 #
 # Reads the already-saved, per-source significant-only GSEA KEGG tables
 # run_compare_exp_gsea() wrote (GSEA_KEGG_<source_label>_<label>.csv) --
 # does not rerun gseKEGG. Mirrors run_compare_exp_kegg_dotplot() in
-# R/compare_exp_rosi_ora.R exactly, except dot SIZE is the leading-edge
-# gene count (core_enrichment split on "/") in place of ORA's Count
-# column, which a gseaResult doesn't have.
+# R/compare_exp_rosi_ora.R, except dot SIZE is the leading-edge gene
+# count (core_enrichment split on "/") in place of ORA's Count column
+# (a gseaResult doesn't have one), and -- since GSEA's NES is inherently
+# directional, unlike ORA's hypergeometric result -- pathways are split
+# into two separate plots by the sign of NES in each (pathway, source)
+# cell: NES > 0 ("up", enriched toward the up-regulated end of the
+# ranked list) and NES < 0 ("down"). A pathway with a significant hit in
+# BOTH directions across different sources/doses (the same kind of
+# direction split explored earlier for gene-set membership in
+# R/geneset_direction_mix.R) legitimately appears in both plots -- that
+# split is itself the point, not an artifact to suppress.
 #===============================================================================
 
 run_compare_exp_gsea_kegg_dotplot <- function(
@@ -799,7 +915,7 @@ run_compare_exp_gsea_kegg_dotplot <- function(
     save_pdf = TRUE
 ) {
 
-    message(sprintf("Running %s GSEA KEGG dot plot...", compound))
+    message(sprintf("Running %s GSEA KEGG dot plots (up/down)...", compound))
 
     if (!requireNamespace("ggplot2", quietly = TRUE)) {
         stop("Package 'ggplot2' is required.")
@@ -840,6 +956,7 @@ run_compare_exp_gsea_kegg_dotplot <- function(
             Description = result_df$Description,
             Count = leading_edge_count,
             p.adjust = result_df$p.adjust,
+            NES = result_df$NES,
             stringsAsFactors = FALSE
         )
 
@@ -851,75 +968,22 @@ run_compare_exp_gsea_kegg_dotplot <- function(
 
     dot_table <- do.call(rbind, rows)
 
-    n_sources_by_pathway <- tapply(dot_table$x_label, dot_table$Description, function(x) length(unique(x)))
-    best_p_by_pathway <- tapply(dot_table$p.adjust, dot_table$Description, min)
-
-    pathway_summary <- data.frame(
-        Description = names(n_sources_by_pathway),
-        n_sources = as.integer(n_sources_by_pathway),
-        best_p = best_p_by_pathway[names(n_sources_by_pathway)],
-        stringsAsFactors = FALSE
-    )
-
-    pathway_summary <- pathway_summary[order(-pathway_summary$n_sources, pathway_summary$best_p), ]
-
-    selected_pathways <- utils::head(pathway_summary$Description, max_pathways)
-
-    dot_table <- dot_table[dot_table$Description %in% selected_pathways, ]
-
-    dot_table$x_label <- factor(dot_table$x_label, levels = x_levels)
-    dot_table$Description <- factor(dot_table$Description, levels = rev(selected_pathways))
-
-    n_pathways_shown <- length(selected_pathways)
-
-    dot_plot <- ggplot2::ggplot(dot_table, ggplot2::aes(x = x_label, y = Description, size = Count, color = p.adjust)) +
-        ggplot2::geom_point() +
-        ggplot2::scale_color_gradient(low = "red", high = "blue") +
-        ggplot2::scale_size_continuous(range = c(2, 9)) +
-        ggplot2::scale_x_discrete(drop = FALSE) +
-        ggplot2::labs(
-            title = sprintf("%s GSEA KEGG Pathway Enrichment Across Doses and Experiments", compound),
-            subtitle = paste0(
-                sprintf("Significant pathways (padj < %s) in at least one source\n", alpha),
-                sprintf("Top %d shown, ranked by breadth then significance; size = leading-edge gene count", n_pathways_shown)
-            ),
-            x = NULL, y = NULL, size = "Leading-edge\ngene count", color = "Adjusted\np-value"
-        ) +
-        ggplot2::theme_bw() +
-        ggplot2::theme(
-            axis.text.x = ggplot2::element_text(size = 8),
-            axis.text.y = ggplot2::element_text(size = 7),
-            panel.grid.major = ggplot2::element_line(color = "grey92")
-        )
-
     dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
     dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
 
-    save_csv(
-        dot_table[, c("x_label", "Description", "Count", "p.adjust")],
-        file.path(table_dir, sprintf("compare_exp_%s_gsea_kegg_dotplot.csv", tolower(compound))),
-        row.names = FALSE
+    up_result <- build_and_save_gsea_direction_dotplot(
+        dot_table[dot_table$NES > 0, ], x_levels, compound, alpha, "Up-Regulated", "up",
+        table_dir, figure_dir, max_pathways, figure_width, figure_height, figure_dpi, save_png, save_pdf
     )
 
-    plot_height <- max(figure_height, 2 + n_pathways_shown * 0.22)
+    down_result <- build_and_save_gsea_direction_dotplot(
+        dot_table[dot_table$NES < 0, ], x_levels, compound, alpha, "Down-Regulated", "down",
+        table_dir, figure_dir, max_pathways, figure_width, figure_height, figure_dpi, save_png, save_pdf
+    )
 
-    if (isTRUE(save_png)) {
-        ggplot2::ggsave(
-            file.path(figure_dir, sprintf("Compare_exp_%s_gsea_kegg_dotplot.png", tolower(compound))),
-            plot = dot_plot, width = figure_width, height = plot_height, dpi = figure_dpi, limitsize = FALSE
-        )
-    }
+    message(sprintf("%s GSEA KEGG dot plots (up/down) complete.", compound))
 
-    if (isTRUE(save_pdf)) {
-        ggplot2::ggsave(
-            file.path(figure_dir, sprintf("Compare_exp_%s_gsea_kegg_dotplot.pdf", tolower(compound))),
-            plot = dot_plot, width = figure_width, height = plot_height, limitsize = FALSE
-        )
-    }
-
-    message(sprintf("%s GSEA KEGG dot plot complete.", compound))
-
-    list(dot_table = dot_table, plot = dot_plot)
+    list(up = up_result, down = down_result)
 
 }
 
